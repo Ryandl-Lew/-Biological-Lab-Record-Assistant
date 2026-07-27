@@ -1,103 +1,55 @@
-/**
- * 登录页面
- * 用户名密码登录，对接 authStore.login。
- * 已登录用户自动跳转到首页。
- */
 import { useState } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Mail, Lock, Eye, EyeOff, CircleAlert, Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
-import './login.css'
+import AuthLayout from '@/components/auth/AuthLayout'
 
 export default function LoginPage() {
-  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const login = useAuthStore((s) => s.login)
   const currentUser = useAuthStore((s) => s.currentUser)
   const loading = useAuthStore((s) => s.loading)
   const navigate = useNavigate()
+  const location = useLocation()
 
-  // 已登录 -> 跳转首页
-  if (!loading && currentUser) {
-    return <Navigate to="/" replace />
-  }
+  if (!loading && currentUser) return <Navigate to="/" replace />
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const handleSubmit = async (event) => {
+    event.preventDefault()
     setError('')
-    if (!username.trim() || !password.trim()) {
-      setError('请输入用户名和密码')
-      return
-    }
+    if (!email.trim() || !password) { setError('请输入邮箱和密码'); return }
     setSubmitting(true)
     try {
-      await login({ username: username.trim(), password })
-      navigate('/', { replace: true })
-    } catch (err) {
-      setError(err.message || '登录失败，请重试')
-    } finally {
-      setSubmitting(false)
-    }
+      await login({ email, password })
+      navigate(location.state?.from || '/', { replace: true })
+    } catch (requestError) {
+      setError(requestError.message || '登录失败，请重试')
+    } finally { setSubmitting(false) }
   }
 
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <div className="login-header">
-          <div className="login-brand-mark">B</div>
-          <h1>BioNote</h1>
-          <p className="login-sub">生物实验记录助手</p>
-        </div>
-
-        <form className="login-form" onSubmit={handleSubmit}>
-          <div className="field">
-            <label htmlFor="username">用户名</label>
-            <input
-              id="username"
-              type="text"
-              placeholder="请输入用户名"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              autoComplete="username"
-              autoFocus
-            />
-          </div>
-
-          <div className="field">
-            <label htmlFor="password">密码</label>
-            <input
-              id="password"
-              type="password"
-              placeholder="请输入密码"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-          </div>
-
-          {error && <div className="login-error">{error}</div>}
-
-          <button
-            type="submit"
-            className="primary-btn login-btn"
-            disabled={submitting}
-          >
-            {submitting ? '登录中...' : '登录'}
-          </button>
-        </form>
-
-        <div className="login-hint">
-          <p className="muted small">本地测试账号</p>
-          <div className="login-accounts">
-            <span className="badge gray">li / 123456</span>
-            <span className="badge gray">wang / 123456</span>
-            <span className="badge gray">zhang / 123456</span>
-            <span className="badge gray">chen / 123456</span>
-            <span className="badge gray">zhao / 123456</span>
+    <AuthLayout title="欢迎回来" subtitle="使用邮箱登录你的 BioNote 账号" footer={<span>还没有账号？ <Link to="/register" className="font-semibold text-brand-600">立即注册</Link></span>}>
+      <form className="space-y-5" onSubmit={handleSubmit}>
+        <div>
+          <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-700">邮箱</label>
+          <div className="relative"><Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoFocus className="input h-11 pl-10" />
           </div>
         </div>
-      </div>
-    </div>
+        <div>
+          <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-700">密码</label>
+          <div className="relative"><Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" className="input h-11 pl-10 pr-11" />
+            <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? '隐藏密码' : '显示密码'} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">{showPassword ? <EyeOff size={16}/> : <Eye size={16}/>}</button>
+          </div>
+        </div>
+        {error && <div role="alert" className="flex gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"><CircleAlert size={16}/>{error}</div>}
+        <button type="submit" disabled={submitting} className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand-600 font-semibold text-white disabled:opacity-60">{submitting && <Loader2 size={16} className="animate-spin"/>}{submitting ? '登录中…' : '登录'}</button>
+      </form>
+    </AuthLayout>
   )
 }

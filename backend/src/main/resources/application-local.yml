@@ -1,0 +1,16 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: ${LOCAL_DB_URL:jdbc:h2:file:./data/bionote-local-v6;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH}
+    username: ${LOCAL_DB_USERNAME:sa}
+    password: ${LOCAL_DB_PASSWORD:}
+  flyway:
+    locations: classpath:db/migration
+  jpa:
+    show-sql: false
+
+bionote:
+  dev-seed-enabled: ${DEV_SEED_ENABLED:true}
+  dev-seed-password: ${DEV_SEED_PASSWORD:Demo123!}

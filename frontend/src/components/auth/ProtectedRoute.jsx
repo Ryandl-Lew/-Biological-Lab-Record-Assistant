@@ -2,10 +2,11 @@
  * ProtectedRoute 路由守卫
  * 未登录时重定向到 /login，正在恢复会话时显示 loading。
  */
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 
 export default function ProtectedRoute({ children }) {
+  const location = useLocation()
   const currentUser = useAuthStore((s) => s.currentUser)
   const loading = useAuthStore((s) => s.loading)
 
@@ -26,7 +27,7 @@ export default function ProtectedRoute({ children }) {
   }
 
   if (!currentUser) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
   }
 
   return children

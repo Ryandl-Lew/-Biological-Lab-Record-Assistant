@@ -1,37 +1,56 @@
-/**
- * API 客户端占位层
- *
- * 当前阶段不接入真实后端：所有请求由 mock 数据包装成 Promise 返回。
- * 后续接入后端时，只需替换本文件为真实 HTTP 客户端（如 Axios），
- * 各业务 API 模块的函数签名保持不变即可平滑迁移。
- */
+/** 后端基础地址，可通过 VITE_API_BASE_URL 覆盖。 */
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
-/** 后端基础地址（后端就绪后启用） */
-export const API_BASE_URL = '/api'
-
-/** 模拟网络延迟（毫秒） */
-const MOCK_DELAY = 200
-
-/**
- * 将 mock 数据包装为 Promise，模拟异步请求。
- * @template T
- * @param {T} data 要返回的数据
- * @returns {Promise<T>}
- */
-export function mockResponse(data) {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve(data), MOCK_DELAY)
-  })
+export class ApiError extends Error {
+  constructor(message, code, fieldErrors, status) {
+    super(message)
+    this.name = 'ApiError'
+    this.code = code
+    this.fieldErrors = fieldErrors
+    this.status = status
+  }
 }
 
 /**
- * 真实请求占位函数。
- * TODO: 后端就绪后用 Axios / fetch 实现，并统一处理鉴权、错误、拦截。
+ * 发送请求并解包后端统一 ApiResponse。
  * @param {string} path
- * @param {RequestInit} [_options]
- * @returns {Promise<never>}
+ * @param {RequestInit} [options]
  */
-export async function request(path, _options) {
-  // TODO: 替换为真实实现
-  throw new Error(`request() 尚未实现：${API_BASE_URL}${path}`)
+export async function request(path, options = {}) {
+  const { responseType = 'json', ...fetchOptions } = options
+  const token = localStorage.getItem('auth_token')
+  const headers = new Headers(fetchOptions.headers)
+  headers.set('Accept', responseType === 'blob' ? '*/*' : 'application/json')
+  if (fetchOptions.body && !(fetchOptions.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+
+  let response
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, { ...fetchOptions, headers })
+  } catch {
+    throw new ApiError('无法连接服务器，请稍后重试', 'NETWORK_ERROR', null, 0)
+  }
+
+  const payload = response.status === 204 ? null : responseType === 'blob'
+    ? await response.blob()
+    : await response.json().catch(() => null)
+  if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('auth_token')
+      window.dispatchEvent(new Event('bionote:unauthorized'))
+    }
+    throw new ApiError(
+      payload?.message || '请求失败，请稍后重试',
+      payload?.code || 'REQUEST_FAILED',
+      payload?.fieldErrors || null,
+      response.status,
+    )
+  }
+  if (responseType === 'blob') return { blob: payload, headers: response.headers }
+  if (payload?.meta) return { items: payload.data, meta: payload.meta }
+  return payload?.data ?? null
 }

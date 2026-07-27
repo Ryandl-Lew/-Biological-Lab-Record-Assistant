@@ -1,58 +1,65 @@
-/**
- * 认证状态管理（Zustand）
- * 管理当前登录用户、token 和登录/登出操作。
- * 登录成功后持久化到 localStorage，刷新页面可恢复会话。
- */
 import { create } from 'zustand'
-import { login as loginApi, logout as logoutApi } from '@/api/auth'
+import { getCurrentUser, login as loginApi, logout as logoutApi, register as registerApi } from '@/api/auth'
+import { updateMyProfile, uploadMyAvatar } from '@/api/users'
 
-export const useAuthStore = create((set, get) => ({
-  /** @type {{ id: string, name: string, email: string, avatarText: string } | null} */
+const clearToken = () => localStorage.removeItem('auth_token')
+
+export const useAuthStore = create((set) => ({
   currentUser: null,
-  /** @type {string | null} */
-  token: null,
-  /** 是否正在加载会话恢复 */
+  token: localStorage.getItem('auth_token'),
   loading: true,
+  error: null,
 
-  /**
-   * 尝试从 localStorage 恢复登录会话
-   */
-  restoreSession: () => {
+  restoreSession: async () => {
     const token = localStorage.getItem('auth_token')
-    const userStr = localStorage.getItem('auth_user')
-    if (token && userStr) {
-      try {
-        const user = JSON.parse(userStr)
-        set({ currentUser: user, token, loading: false })
-        return
-      } catch {
-        // ignore
-      }
+    if (!token) {
+      set({ currentUser: null, token: null, loading: false })
+      return
     }
-    set({ loading: false })
-  },
-
-  /**
-   * 登录
-   * @param {{ username: string, password: string }} credentials
-   */
-  login: async (credentials) => {
-    const { user, token } = await loginApi(credentials)
-    localStorage.setItem('auth_token', token)
-    localStorage.setItem('auth_user', JSON.stringify(user))
-    set({ currentUser: user, token })
-  },
-
-  /**
-   * 登出
-   */
-  logout: async () => {
     try {
-      await logoutApi()
-    } finally {
-      localStorage.removeItem('auth_token')
-      localStorage.removeItem('auth_user')
+      const user = await getCurrentUser()
+      set({ currentUser: user, token, loading: false, error: null })
+    } catch (error) {
+      clearToken()
+      set({ currentUser: null, token: null, loading: false, error })
+    }
+  },
+
+  login: async ({ email, password }) => {
+    const result = await loginApi({ email: email.trim(), password })
+    localStorage.setItem('auth_token', result.accessToken)
+    set({ currentUser: result.user, token: result.accessToken, error: null })
+    return result.user
+  },
+
+  register: async ({ displayName, email, password }) => {
+    const result = await registerApi({ displayName: displayName.trim(), email: email.trim(), password })
+    localStorage.setItem('auth_token', result.accessToken)
+    set({ currentUser: result.user, token: result.accessToken, error: null })
+    return result.user
+  },
+
+  updateProfile: async (displayName) => {
+    const user = await updateMyProfile(displayName)
+    set({ currentUser: user })
+    return user
+  },
+
+  uploadAvatar: async (file) => {
+    const user = await uploadMyAvatar(file)
+    set({ currentUser: user })
+    return user
+  },
+
+  logout: async () => {
+    try { await logoutApi() } finally {
+      clearToken()
       set({ currentUser: null, token: null })
     }
+  },
+
+  clearSession: () => {
+    clearToken()
+    set({ currentUser: null, token: null, loading: false })
   },
 }))

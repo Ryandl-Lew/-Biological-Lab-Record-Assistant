@@ -1,6 +1,6 @@
 /**
- * Surface 卡片容器
- * 对应原型 .surface；可选带标题栏（title + 右侧操作）。
+ * Surface 卡片容器（新设计）
+ * 白色圆角卡片；可选带标题栏（title + 右侧操作区）。
  */
 
 /**
@@ -13,10 +13,17 @@
  */
 export default function Surface({ title, extra, className = '', style, children }) {
   return (
-    <section className={`surface ${className}`.trim()} style={style}>
+    <section
+      className={`rounded-xl border border-slate-200 bg-white p-5 shadow-card ${className}`.trim()}
+      style={style}
+    >
       {(title || extra) && (
-        <div className="surface-head">
-          {title ? <h2>{title}</h2> : <span />}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          {title ? (
+            <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+          ) : (
+            <span />
+          )}
           {extra}
         </div>
       )}

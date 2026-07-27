@@ -3,22 +3,19 @@ spring:
     url: jdbc:h2:mem:bionote;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
     username: sa
     password:
-    driver-class-name: org.h2.Driver
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: validate
-
+  flyway:
+    locations: classpath:db/migration
+agent:
+  enabled: false
+  provider: fake
+  model: fake-deterministic-v1
+  worker-poll-ms: 60000
 bionote:
+  restore-preview-secret: test-only-restore-preview-secret-with-at-least-32-characters
   jwt:
-    secret: test-secret-must-be-at-least-thirty-two-characters-long
-    expiration-seconds: 3600
-  seed:
-    enabled: true
-
-debug: false
-
-logging:
-  level:
-    root: WARN
-    com.bionote: INFO
+    secret: test-secret-with-at-least-thirty-two-characters-123456
+    ttl-minutes: 5
+  upload-root: ${java.io.tmpdir}/bionote-test-uploads

@@ -1,0 +1,3 @@
+{
+  "allowedTools": ["runtime_echo", "runtime_counter"]
+}

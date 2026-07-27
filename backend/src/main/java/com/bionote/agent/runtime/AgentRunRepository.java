@@ -1,0 +1,42 @@
+package com.bionote.agent.runtime;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.bionote.collaboration.event.AgentRunSucceededEvent;
+import com.bionote.collaboration.event.DomainEventPublisher;
+import com.bionote.common.ApiException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.UUID;
+
+@Repository
+public class AgentRunRepository {
+    private final JdbcTemplate jdbc;private final ObjectMapper json;private final AgentRunStateMachine states;private final DomainEventPublisher events;
+    public AgentRunRepository(JdbcTemplate jdbc,ObjectMapper json,AgentRunStateMachine states,DomainEventPublisher events){this.jdbc=jdbc;this.json=json;this.states=states;this.events=events;}
+    public AgentRunRecord enqueue(UUID id,String artifactKind,String subjectType,UUID subjectId,UUID projectId,UUID recordId,UUID requestedBy,String triggerType,String provider,String model,UUID promptVersionId,UUID parentRunId,String key,String requestJson,String payloadHash,String cursorJson,String limitsJson){Instant now=Instant.now();jdbc.update("INSERT INTO agent_runs(id,artifact_kind,subject_type,subject_id,project_id,record_id,requested_by,trigger_type,status,provider,model,prompt_version_id,parent_run_id,idempotency_key,request_json,payload_hash,input_cursor_json,limits_json,created_at,version) VALUES(?,?,?,?,?,?,?,?, 'QUEUED',?,?,?,?,?,?,?,?,?,?,0)",id.toString(),artifactKind,subjectType,subjectId.toString(),projectId.toString(),value(recordId),requestedBy.toString(),triggerType,provider,model,promptVersionId.toString(),value(parentRunId),key,requestJson,payloadHash,cursorJson,limitsJson,Timestamp.from(now));return load(id);}
+    public AgentRunRecord findByRequesterKey(UUID requester,String key){List<AgentRunRecord> rows=jdbc.query("SELECT * FROM agent_runs WHERE requested_by=? AND idempotency_key=?",(rs,n)->map(rs),requester.toString(),key);return rows.isEmpty()?null:rows.get(0);}
+    public AgentRunRecord load(UUID id){return jdbc.query("SELECT * FROM agent_runs WHERE id=?",(rs,n)->map(rs),id.toString()).stream().findFirst().orElseThrow(()->new IllegalStateException("Agent run not found: "+id));}
+    public AgentRunRecord claimNext(){List<Candidate> candidates=jdbc.query("SELECT id,version FROM agent_runs WHERE status='QUEUED' ORDER BY created_at,id LIMIT 10",(rs,n)->new Candidate(UUID.fromString(rs.getString(1)),rs.getLong(2)));for(Candidate candidate:candidates){Instant now=Instant.now();int changed=jdbc.update("UPDATE agent_runs SET status='RUNNING',started_at=?,version=version+1 WHERE id=? AND status='QUEUED' AND version=?",Timestamp.from(now),candidate.id.toString(),candidate.version);if(changed==1)return load(candidate.id);}return null;}
+    public boolean cancelRequested(UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("SELECT cancel_requested_at IS NOT NULL FROM agent_runs WHERE id=?",Boolean.class,id.toString()));}
+    public String requestCancel(UUID id){AgentRunRecord run=load(id);if(states.terminal(run.status()))return run.status();if("QUEUED".equals(run.status())){states.require("QUEUED","CANCELLED");jdbc.update("UPDATE agent_runs SET status='CANCELLED',cancel_requested_at=?,finished_at=?,version=version+1 WHERE id=? AND status='QUEUED'",Timestamp.from(Instant.now()),Timestamp.from(Instant.now()),id.toString());return "CANCELLED";}jdbc.update("UPDATE agent_runs SET cancel_requested_at=COALESCE(cancel_requested_at,?),version=version+1 WHERE id=? AND status='RUNNING'",Timestamp.from(Instant.now()),id.toString());return "RUNNING";}
+    public void incrementToolCalls(UUID id,int count){jdbc.update("UPDATE agent_runs SET tool_call_count=tool_call_count+? WHERE id=? AND status='RUNNING'",count,id.toString());}
+    public void finish(UUID id,String status,String code,String message){states.require("RUNNING",status);int changed=jdbc.update("UPDATE agent_runs SET status=?,error_code=?,error_message=?,finished_at=?,version=version+1 WHERE id=? AND status='RUNNING'",status,code,limit(message,1000),Timestamp.from(Instant.now()),id.toString());if(changed!=1)throw new IllegalStateException("Agent run is no longer RUNNING: "+id);}
+    @Transactional public UUID completeWithArtifact(UUID runId,JsonNode content,JsonNode evidence){AgentRunRecord run=loadForUpdate(runId);states.require(run.status(),"SUCCEEDED");if(run.cancelRequestedAt()!=null)throw new ApiException(HttpStatus.CONFLICT,"AGENT_RUN_CANCELLED","Agent run was cancelled before artifact persistence");UUID artifact=UUID.randomUUID();String contentJson=encode(content),evidenceJson=encode(evidence),hash=hash(contentJson);Instant now=Instant.now();jdbc.update("INSERT INTO agent_artifacts(id,run_id,artifact_kind,project_id,record_id,content_json,evidence_json,content_hash,created_at) VALUES(?,?,?,?,?,?,?,?,?)",artifact.toString(),runId.toString(),run.artifactKind(),run.projectId().toString(),value(run.recordId()),contentJson,evidenceJson,hash,Timestamp.from(now));int changed=jdbc.update("UPDATE agent_runs SET status='SUCCEEDED',finished_at=?,version=version+1 WHERE id=? AND status='RUNNING' AND cancel_requested_at IS NULL",Timestamp.from(now),runId.toString());if(changed!=1)throw new ApiException(HttpStatus.CONFLICT,"AGENT_RUN_CANCELLED","Agent run was cancelled before completion");events.publish(new AgentRunSucceededEvent(UUID.randomUUID(),run.requestedBy(),run.projectId(),run.recordId(),now,runId,run.artifactKind(),run.triggerType(),"SUCCEEDED",artifact));return artifact;}
+    public int failStaleRunning(Instant cutoff){return jdbc.update("UPDATE agent_runs SET status='FAILED',error_code='WORKER_INTERRUPTED',error_message='Worker stopped before the run completed',finished_at=?,version=version+1 WHERE status='RUNNING' AND started_at<?",Timestamp.from(Instant.now()),Timestamp.from(cutoff));}
+    public JsonNode artifact(UUID runId){String content=jdbc.queryForObject("SELECT content_json FROM agent_artifacts WHERE run_id=?",String.class,runId.toString());try{return json.readTree(content);}catch(Exception e){throw new IllegalStateException(e);}}
+    private AgentRunRecord loadForUpdate(UUID id){return jdbc.query("SELECT * FROM agent_runs WHERE id=? FOR UPDATE",(rs,n)->map(rs),id.toString()).stream().findFirst().orElseThrow(()->new IllegalStateException("Agent run not found: "+id));}
+    private AgentRunRecord map(java.sql.ResultSet rs)throws java.sql.SQLException{return new AgentRunRecord(UUID.fromString(rs.getString("id")),rs.getString("artifact_kind"),rs.getString("subject_type"),UUID.fromString(rs.getString("subject_id")),UUID.fromString(rs.getString("project_id")),uuid(rs.getString("record_id")),UUID.fromString(rs.getString("requested_by")),rs.getString("trigger_type"),rs.getString("status"),rs.getString("provider"),rs.getString("model"),UUID.fromString(rs.getString("prompt_version_id")),uuid(rs.getString("parent_run_id")),rs.getString("request_json"),rs.getString("idempotency_key"),rs.getString("payload_hash"),rs.getString("input_cursor_json"),rs.getString("limits_json"),rs.getInt("step_count"),rs.getInt("tool_call_count"),rs.getLong("input_tokens"),rs.getLong("output_tokens"),instant(rs.getTimestamp("cancel_requested_at")),rs.getTimestamp("created_at").toInstant(),instant(rs.getTimestamp("started_at")),instant(rs.getTimestamp("finished_at")),rs.getString("error_code"),rs.getString("error_message"),rs.getLong("version"));}
+    private String encode(JsonNode value){try{return json.writeValueAsString(value);}catch(Exception e){throw new IllegalArgumentException(e);}}
+    private String hash(String value){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));}catch(Exception e){throw new IllegalStateException(e);}}
+    private String value(UUID id){return id==null?null:id.toString();}private UUID uuid(String value){return value==null?null:UUID.fromString(value);}private Instant instant(Timestamp value){return value==null?null:value.toInstant();}private String limit(String value,int max){if(value==null)return null;return value.length()<=max?value:value.substring(0,max);}
+    private record Candidate(UUID id,long version){}
+}

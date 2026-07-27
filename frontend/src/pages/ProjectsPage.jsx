@@ -1,55 +1,22 @@
-/**
- * 项目管理 Projects
- * 项目卡片列表 + 筛选栏。
- */
-import { useEffect, useState } from 'react'
-import { PageHeader } from '@/components/ui'
+import { useCallback, useEffect, useState } from 'react'
+import { AlignLeft, FileText, FolderSearch, Plus, Search, X } from 'lucide-react'
+import { Button, EmptyState, PageHeader } from '@/components/ui'
 import ProjectCard from '@/components/project/ProjectCard'
-import { fetchProjects } from '@/api'
-import { useAppStore } from '@/store/appStore'
+import { createProject, fetchProjects } from '@/api'
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState([])
-  const setCurrentProject = useAppStore((s) => s.setCurrentProject)
-
-  useEffect(() => {
-    fetchProjects().then(setProjects)
-  }, [])
-
-  return (
-    <section>
-      <PageHeader
-        eyebrow="项目管理"
-        title="项目列表与进度"
-        description="查看、新建、搜索、编辑和归档项目；进入项目后查看概览、时间线和成员。"
-        actions={<button className="primary-btn">＋ 新建项目</button>}
-      />
-
-      {/* TODO: 接入真实筛选逻辑 */}
-      <div className="filters">
-        <input type="search" placeholder="搜索项目" aria-label="项目搜索" />
-        <select>
-          <option>全部状态</option>
-          <option>进行中</option>
-          <option>已完成</option>
-          <option>暂停</option>
-        </select>
-        <select>
-          <option>全部负责人</option>
-          <option>李同学</option>
-          <option>张老师</option>
-        </select>
-      </div>
-
-      <div className="project-grid">
-        {projects.map((project) => (
-          <ProjectCard
-            key={project.id}
-            project={project}
-            onSetCurrent={(p) => setCurrentProject(p.id)}
-          />
-        ))}
-      </div>
-    </section>
-  )
+  const [projects,setProjects]=useState([]),[keyword,setKeyword]=useState(''),[status,setStatus]=useState('')
+  const [meta,setMeta]=useState({page:0,totalElements:0,totalPages:0}),[loading,setLoading]=useState(true),[error,setError]=useState('')
+  const [showCreate,setShowCreate]=useState(false),[form,setForm]=useState({name:'',description:'',detailedDescription:''}),[submitting,setSubmitting]=useState(false)
+  const load=useCallback(async(page=0)=>{setLoading(true);setError('');try{const result=await fetchProjects({keyword,status,page,size:20});setProjects(result.items);setMeta(result.meta)}catch(e){setError(e.message)}finally{setLoading(false)}},[keyword,status])
+  useEffect(()=>{const timer=setTimeout(()=>load(0),250);return()=>clearTimeout(timer)},[load])
+  const closeCreate=()=>{if(!submitting){setShowCreate(false);setForm({name:'',description:'',detailedDescription:''})}}
+  const submit=async(e)=>{e.preventDefault();setSubmitting(true);setError('');try{await createProject({name:form.name.trim(),description:form.description.trim(),detailedDescription:form.detailedDescription.trim()});setShowCreate(false);setForm({name:'',description:'',detailedDescription:''});await load(0)}catch(err){setError(err.message)}finally{setSubmitting(false)}}
+  return <section><PageHeader eyebrow="项目管理" title="参与的项目" description="查看你作为负责人、编辑成员或审核者参与的全部项目。" actions={<Button icon={Plus} onClick={()=>setShowCreate(true)}>新建项目</Button>}/>
+    <div className="mb-6 flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-card"><div className="relative min-w-[240px] flex-1 sm:max-w-md"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><input aria-label="项目搜索" type="search" value={keyword} onChange={e=>setKeyword(e.target.value)} className="input h-10 pl-9" placeholder="搜索项目名称或简介"/></div><select aria-label="按状态筛选" value={status} onChange={e=>setStatus(e.target.value)} className="input h-10 w-40"><option value="">全部状态</option><option value="ACTIVE">进行中</option><option value="ARCHIVED">已归档</option></select><span className="ml-auto self-center text-xs text-slate-400">共 {meta.totalElements} 个项目</span></div>
+    {error&&<p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+    {loading?<p className="py-12 text-center text-sm text-slate-400">加载项目中…</p>:projects.length?<div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">{projects.map(p=><ProjectCard key={p.id} project={p}/>)}</div>:<EmptyState icon={FolderSearch} title="没有匹配的项目" description="创建第一个项目，或调整搜索条件。"/>}
+    {meta.totalPages>1&&<div className="mt-6 flex justify-center gap-2"><Button variant="secondary" disabled={meta.page===0} onClick={()=>load(meta.page-1)}>上一页</Button><span className="self-center text-sm">{meta.page+1} / {meta.totalPages}</span><Button variant="secondary" disabled={meta.page+1>=meta.totalPages} onClick={()=>load(meta.page+1)}>下一页</Button></div>}
+    {showCreate&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4"><form onSubmit={submit} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-pop"><div className="flex items-start justify-between border-b border-slate-100 px-6 py-5"><div><h2 className="text-xl font-semibold">新建项目</h2><p className="mt-1 text-sm text-slate-500">创建后你将自动成为项目负责人。</p></div><button type="button" aria-label="关闭" onClick={closeCreate} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X size={18}/></button></div><div className="space-y-5 px-6 py-5"><div><label htmlFor="project-name" className="field-label">项目名称 *</label><div className="relative"><FileText size={16} className="absolute left-3 top-3 text-slate-400"/><input id="project-name" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} maxLength={120} required autoFocus className="input h-11 pl-10" placeholder="例如：CRISPR 细胞系构建"/></div></div><div><div className="flex items-center justify-between"><label htmlFor="project-description" className="field-label">项目简介</label><span className="text-xs text-slate-400">{form.description.length}/500</span></div><textarea id="project-description" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} maxLength={500} className="input min-h-24 resize-y" placeholder="用于项目列表卡片的简短摘要"/></div><div><div className="flex items-center justify-between"><label htmlFor="project-detailed-description" className="field-label">项目详细描述</label><span className="text-xs text-slate-400">{form.detailedDescription.length}/10000</span></div><div className="relative"><AlignLeft size={16} className="absolute left-3 top-3 text-slate-400"/><textarea id="project-detailed-description" value={form.detailedDescription} onChange={e=>setForm({...form,detailedDescription:e.target.value})} maxLength={10000} className="input min-h-44 resize-y pl-10" placeholder="说明研究背景、目标、实验范围、协作方式或里程碑"/></div></div></div><div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50/70 px-6 py-4"><Button variant="secondary" onClick={closeCreate}>取消</Button><Button type="submit" loading={submitting}>创建项目</Button></div></form></div>}
+  </section>
 }

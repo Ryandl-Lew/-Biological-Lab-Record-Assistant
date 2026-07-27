@@ -1,34 +1,16 @@
-/**
- * 模板相关 API
- */
-import { mockTemplates } from '@/mocks/data'
-import { mockResponse } from './client'
+import { request } from './client'
 
-/**
- * 获取模板列表
- * @returns {Promise<import('@/domain/models').Template[]>}
- */
-export function fetchTemplates() {
-  // TODO: GET /api/templates
-  return mockResponse(mockTemplates)
+const qs = (params = {}) => {
+  const search = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') search.set(key, value)
+  })
+  return search.toString() ? `?${search}` : ''
 }
 
-/**
- * 获取模板详情（含字段结构）
- * @param {string} id
- * @returns {Promise<import('@/domain/models').Template | undefined>}
- */
-export function fetchTemplate(id) {
-  // TODO: GET /api/templates/:id
-  return mockResponse(mockTemplates.find((t) => t.id === id))
-}
-
-/**
- * 基于模板新建实验记录（返回预填的草稿标识）
- * @param {string} _templateId
- * @returns {Promise<{ recordId: string }>}
- */
-export function createRecordFromTemplate(_templateId) {
-  // TODO: POST /api/templates/:id/use
-  return mockResponse({ recordId: 'r-new' })
-}
+export const fetchTemplates = (params) => request(`/templates${qs(params)}`)
+export const fetchTemplate = (id) => request(`/templates/${id}`)
+export const createTemplate = (input) => request('/templates', { method: 'POST', body: JSON.stringify(input) })
+export const updateTemplate = (id, input) => request(`/templates/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+export const deleteTemplate = (id) => request(`/templates/${id}`, { method: 'DELETE' })
+export const copyTemplate = (id) => request(`/templates/${id}/copy`, { method: 'POST' })

@@ -1,49 +1,22 @@
-# BioNote 前端骨架
+# BioNote Frontend
 
-生物实验记录助手的前端工程骨架。本阶段仅搭建**可运行、可扩展**的基础框架：页面结构、路由、组件边界、类型/接口占位，业务逻辑以 mock 数据与 TODO 标记占位。
+React + Vite 前端，使用真实 `/api/v1` 服务，不包含业务 mock、假成功或独立 AI 聊天页。完整启动、演示和后端配置见根目录 `README.md`。
 
-## 技术栈
+第二阶段入口：
 
-- **React 18** + **Vite 5**（JavaScript / JSX）
-- **React Router 6** 路由
-- **Zustand** 轻量全局状态
-- 纯 CSS 设计系统（令牌抽取自原型 `bionote-static-legacy.html`）
+- 记录 `?tab=history`：Revision History、详情、R1/R2/Working Copy、Diff、Restore Preview。
+- 记录 `?tab=summary`：Record Summary、Evidence、Trace Replay、cancel/rerun。
+- 项目 `?tab=progress`：Project Progress、历史 Artifact、Evidence、Trace Replay。
 
-> 项目《技术选型与学习计划》另列了 Ant Design / Axios / ECharts。本骨架阶段暂未引入，
-> 以保持轻量并贴合原型自带的视觉风格；后续按需接入即可（API 层 `src/api` 为替换点）。
+Run 以 2/3/5 秒退避轮询，终态或卸载时停止。Replay 只展开后端保存的脱敏 step，不重新调用模型或工具。Revision 与 Agent 面板使用懒加载。
 
-## 启动与构建
-
-```bash
-cd frontend
-npm install      # 安装依赖
-npm run dev      # 本地开发，默认 http://localhost:5173
-npm run build    # 生产构建，输出到 dist/
-npm run preview  # 预览构建产物
+```powershell
+npm.cmd ci
+npm.cmd run dev
+npm.cmd run lint
+npm.cmd test -- --run
+npm.cmd run build
+npm.cmd run test:e2e
 ```
 
-## 目录结构
-
-```
-src/
-├── main.jsx / App.jsx        入口与根组件
-├── router/                   路由配置
-├── domain/                   业务枚举 + 标签映射 + JSDoc 类型
-├── mocks/                    原型抽取的 mock 数据（TODO: 后端就绪后移除）
-├── api/                      接口调用层（当前返回 mock Promise）
-├── store/                    Zustand 全局状态
-├── styles/                   全局基础样式与设计令牌
-├── components/
-│   ├── layout/               AppLayout / Sidebar / Topbar
-│   ├── ui/                   Badge / StatusBadge / Surface / StatCard / PageHeader / GelPreview
-│   ├── project/              ProjectCard
-│   ├── record/               RecordTree
-│   └── template/             TemplateCard
-└── pages/                    各功能页面
-```
-
-## 后续开发指引
-
-- 真实接口：替换 `src/api/client.js`（接入 Axios/fetch），各业务 API 函数签名保持不变。
-- 状态管理：如复杂度上升，可在 `src/store` 下拆分多个 store。
-- 组件内 `TODO` 注释标记了尚未实现的交互与业务逻辑。
+Playwright 需要本机 MySQL 3306 可用；首次运行执行 `npx.cmd playwright install chromium`。E2E 覆盖 Revision/Diff/Restore、权限、Agent 成功、Evidence/Trace，以及 invalid output、unknown tool、timeout、非法 Evidence 和 cancel。开发服务器把 `/api` 代理到 `http://localhost:8080`。
