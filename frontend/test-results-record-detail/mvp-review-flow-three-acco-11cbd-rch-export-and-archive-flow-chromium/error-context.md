@@ -1,0 +1,62 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - img [ref=e8]
+      - generic [ref=e10]: BioNote
+    - generic [ref=e11]:
+      - heading "让每一次实验 都有迹可循" [level=1] [ref=e12]:
+        - text: 让每一次实验
+        - text: 都有迹可循
+      - paragraph [ref=e13]: BioNote 是专为生物科研团队打造的电子实验记录本， 帮助你规范记录、高效检索、安心协作。
+    - list [ref=e14]:
+      - listitem [ref=e15]:
+        - img [ref=e17]
+        - generic [ref=e20]:
+          - generic [ref=e21]: 结构化实验记录
+          - generic [ref=e22]: 模板化记录实验全过程，数据规范可追溯
+      - listitem [ref=e23]:
+        - img [ref=e25]
+        - generic [ref=e28]:
+          - generic [ref=e29]: 全文快速检索
+          - generic [ref=e30]: 项目、记录、附件，一秒定位所需信息
+      - listitem [ref=e31]:
+        - img [ref=e33]
+        - generic [ref=e38]:
+          - generic [ref=e39]: 团队实时协作
+          - generic [ref=e40]: 成员共享工作区，进度同步一目了然
+      - listitem [ref=e41]:
+        - img [ref=e43]
+        - generic [ref=e46]:
+          - generic [ref=e47]: 审计与版本追踪
+          - generic [ref=e48]: 完整修订历史，满足科研合规要求
+  - generic [ref=e49]:
+    - generic [ref=e50]:
+      - generic [ref=e51]:
+        - heading "欢迎回来" [level=2] [ref=e52]
+        - paragraph [ref=e53]: 使用邮箱登录你的 BioNote 账号
+        - generic [ref=e55]:
+          - generic [ref=e56]:
+            - generic [ref=e57]: 邮箱
+            - generic [ref=e58]:
+              - img [ref=e59]
+              - textbox "邮箱" [ref=e62]: a-1785121289805-y90qmp@example.com
+          - generic [ref=e63]:
+            - generic [ref=e64]: 密码
+            - generic [ref=e65]:
+              - img [ref=e66]
+              - textbox "密码" [ref=e69]: E2eDemo123!
+              - button "显示密码" [ref=e70] [cursor=pointer]:
+                - img [ref=e71] [cursor=pointer]
+          - alert [ref=e74]:
+            - img [ref=e75]
+            - text: 邮箱或密码错误
+          - button "登录" [ref=e77] [cursor=pointer]
+      - generic [ref=e79]:
+        - text: 还没有账号？
+        - link "立即注册" [ref=e80] [cursor=pointer]:
+          - /url: /register
+    - paragraph [ref=e81]: © 2026 BioNote · 生物实验记录助手
+```

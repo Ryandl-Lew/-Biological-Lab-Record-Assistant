@@ -14,6 +14,7 @@
  */
 import { Link } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
+import { forwardRef } from 'react'
 
 const VARIANTS = {
   primary:
@@ -37,7 +38,7 @@ const SIZES = {
 
 const ICON_SIZES = { sm: 14, md: 16 }
 
-export default function Button({
+const Button = forwardRef(function Button({
   variant = 'primary',
   size = 'md',
   icon: Icon,
@@ -48,7 +49,7 @@ export default function Button({
   className = '',
   children,
   ...rest
-}) {
+}, ref) {
   const cls = [
     'inline-flex select-none items-center justify-center whitespace-nowrap font-medium transition-colors',
     VARIANTS[variant] ?? VARIANTS.primary,
@@ -70,15 +71,17 @@ export default function Button({
 
   if (to) {
     return (
-      <Link to={to} className={cls} {...rest}>
+      <Link ref={ref} to={to} className={cls} {...rest}>
         {content}
       </Link>
     )
   }
 
   return (
-    <button type={type} disabled={disabled || loading} className={cls} {...rest}>
+    <button ref={ref} type={type} disabled={disabled || loading} className={cls} {...rest}>
       {content}
     </button>
   )
-}
+})
+
+export default Button

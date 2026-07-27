@@ -72,7 +72,10 @@ public class DemoDataService {
         seedQpcrProject(member, owner, reviewer);
         seedCellCultureProject(owner, member, reviewer);
         seedArchivedCourseProject(owner, member, reviewer);
+        enhancePhase2RevisionDemo(reviewer);
     }
+
+    private void enhancePhase2RevisionDemo(UUID reviewer){List<String> records=jdbc.queryForList("SELECT id FROM experiment_records WHERE title LIKE ? AND current_revision_no=1 AND status='CHANGES_REQUESTED'",String.class,"HepG2 缺氧 12 h VEGFA 表达分析%");if(records.isEmpty())return;UUID recordId=UUID.fromString(records.get(0));UUID creator=UUID.fromString(jdbc.queryForObject("SELECT creator_id FROM experiment_records WHERE id=?",String.class,recordId.toString()));RecordDtos.View changed=recordService.get(creator,recordId);Map<String,Object> revisedValues=new LinkedHashMap<>(changed.fieldValues());revisedValues.put("relative_expression",3.42);revisedValues.put("melt_curve_result","存在多峰或杂峰");Integer supplement=jdbc.queryForObject("SELECT COUNT(*) FROM attachments WHERE record_id=? AND original_filename=? AND deleted_at IS NULL",Integer.class,recordId.toString(),"VEGFA-R2-扩增曲线复核.md");if(supplement!=null&&supplement==0)attachmentService.upload(creator,recordId,markdown("VEGFA-R2-扩增曲线复核.md","# VEGFA R2 扩增曲线复核\n\n- H12-2 A9 复孔偏离 0.71 Ct\n- 熔解曲线肩峰仍可见\n- 建议补充引物特异性与异常孔剔除标准\n").file());RecordDtos.View revised=recordService.update(creator,recordId,new RecordDtos.UpdateRequest(changed.version(),changed.title()+"（R2 复核）",changed.experimentType(),changed.experimentDate(),changed.purpose()+" 已根据 R1 审核意见补充异常孔复核。",revisedValues,changed.contentJson(),changed.contentHtml()+"<h2>R1 退回后补充</h2><p>已核对扩增曲线和异常复孔，仍需补做引物特异性验证。</p>"));ReviewDtos.RevisionView r2=reviewService.submit(creator,recordId,new ReviewDtos.SubmitRequest(reviewer,"已按 R1 意见补充，提交 R2",revised.version()),"seed:"+recordId+":r2");reviewService.requestChanges(reviewer,recordId,r2.review().id(),"R2 已补充曲线复核，但仍需给出引物特异性验证结果后再批准。");}
 
     private void seedPcrOptimizationProject(UUID owner, UUID member, UUID reviewer) {
         String name = "BRCA1 外显子 PCR 条件优化";
@@ -144,7 +147,7 @@ public class DemoDataService {
                         "存在肩峰", "H12-2 的一个技术重复偏离 0.71 Ct，且目标基因熔解曲线出现轻微肩峰，需复核。"),
                 "<h2>异常说明</h2><p>H12-2 第三个复孔 Ct=29.84，较其余两个复孔高 0.71 Ct；熔解曲线主峰旁存在轻微肩峰。</p><h2>初步结果</h2><p>未剔除异常孔时 VEGFA 相对表达约为 3.87 倍。</p>",
                 List.of(csv("VEGFA-12h-Ct待复核.csv", "sample,well,target_ct,reference_ct\nH12-2,A7,29.13,19.88\nH12-2,A8,29.18,19.91\nH12-2,A9,29.84,19.90\n", "raw_data_file")));
-        transition(member, reviewer, vegfa, Outcome.CHANGES_REQUESTED,
+        transition(member, reviewer, vegfa, Outcome.CHANGES_REQUESTED_R2,
                 "请核对 H12-2 异常复孔的扩增曲线，并补充预先定义的异常孔剔除标准。", null);
 
         createRecord(owner, project.id(), null,
@@ -275,15 +278,22 @@ public class DemoDataService {
         }
         reviewService.requestChanges(reviewer, record.id(), r1.review().id(), changesComment);
         RecordDtos.View changed = recordService.get(creator, record.id());
+        Map<String,Object> revisedValues = new LinkedHashMap<>(changed.fieldValues());
+        if (outcome == Outcome.CHANGES_REQUESTED_R2) {
+            revisedValues.put("relative_expression", 3.42);
+            revisedValues.put("melt_curve_result", "存在多峰或杂峰");
+            attachmentService.upload(creator, record.id(), markdown("VEGFA-R2-扩增曲线复核.md", "# VEGFA R2 扩增曲线复核\n\n- H12-2 A9 复孔偏离 0.71 Ct\n- 熔解曲线肩峰仍可见\n- 建议补充引物特异性与异常孔剔除标准\n").file());
+        }
         String revisedPurpose = changed.purpose() + " 已根据 R1 审核意见补充对照解释并完成复核。";
         String revisedHtml = changed.contentHtml() + "<h2>R1 退回后补充</h2><p>已核对原始数据、阴性对照和判读标准，并补充选择依据。</p>";
         RecordDtos.View revised = recordService.update(creator, record.id(),
-                new RecordDtos.UpdateRequest(changed.version(), changed.title(), changed.experimentType(),
-                        changed.experimentDate(), revisedPurpose, changed.fieldValues(), changed.contentJson(), revisedHtml));
+                new RecordDtos.UpdateRequest(changed.version(), outcome == Outcome.CHANGES_REQUESTED_R2 ? changed.title() + "（R2 复核）" : changed.title(), changed.experimentType(),
+                        changed.experimentDate(), revisedPurpose, revisedValues, changed.contentJson(), revisedHtml));
         ReviewDtos.RevisionView r2 = reviewService.submit(creator, record.id(),
                 new ReviewDtos.SubmitRequest(reviewer, "已按 R1 意见补充，提交 R2", revised.version()),
                 "seed:" + record.id() + ":r2");
-        reviewService.approve(reviewer, record.id(), r2.review().id(), approvalComment);
+        if (outcome == Outcome.CHANGES_REQUESTED_R2) reviewService.requestChanges(reviewer, record.id(), r2.review().id(), "R2 已补充曲线复核，但仍需给出引物特异性验证结果后再批准。");
+        else reviewService.approve(reviewer, record.id(), r2.review().id(), approvalComment);
     }
 
     private Map<String, Object> pcrValues(String sample, String source, String target, double annealing,
@@ -403,7 +413,7 @@ public class DemoDataService {
         return jdbc.queryForObject("SELECT email_normalized FROM users WHERE id=?", String.class, userId.toString());
     }
 
-    private enum Outcome { IN_REVIEW, CHANGES_REQUESTED, COMPLETED_R1, COMPLETED_R2 }
+    private enum Outcome { IN_REVIEW, CHANGES_REQUESTED, CHANGES_REQUESTED_R2, COMPLETED_R1, COMPLETED_R2 }
     private record Account(String displayName, String email) {}
     private record AttachmentSeed(SeedMultipartFile file, String fieldKey) {}
 

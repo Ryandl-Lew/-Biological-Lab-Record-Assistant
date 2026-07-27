@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test'
 
-export const API_BASE = 'http://127.0.0.1:8080/api/v1'
+export const API_BASE = process.env.E2E_API_BASE || 'http://127.0.0.1:8080/api/v1'
 export const PASSWORD = 'E2eDemo123!'
 
 export function unique(prefix) {

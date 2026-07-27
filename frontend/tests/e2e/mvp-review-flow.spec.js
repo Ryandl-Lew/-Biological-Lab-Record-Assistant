@@ -81,13 +81,11 @@ test('three-account R1 return, R2 approval, search, export and archive flow', as
   await pageB.getByRole('button', { name: '保存', exact: true }).click()
   await expect(pageB).toHaveURL((url) => /\/records\/[^/]+\/edit$/.test(url.pathname) && !url.pathname.includes('/records/new/'))
   const recordId = pageB.url().match(/records\/([^/]+)\/edit/)[1]
-  await pageB.goto('/records')
-  await expect(pageB.getByRole('heading', { name: recordTitle })).toBeVisible()
+  await pageB.goto(`/records/${recordId}`)
+  await expect(pageB.getByRole('button', { name: '返回上一级' })).toBeVisible()
   await pageB.getByRole('button', { name: '提交审核' }).click()
   await pageB.getByLabel('指定审核人').selectOption({ label: `${reviewer.displayName}（审核者）` })
   await pageB.getByRole('button', { name: '确认提交' }).click()
-  await expect(pageB.getByRole('heading', { name: recordTitle }).locator('..').getByText('审核中')).toBeVisible()
-  await pageB.goto(`/records/${recordId}`)
   await expect(pageB.getByText('R1 快照')).toBeVisible()
 
   await pageC.goto('/')

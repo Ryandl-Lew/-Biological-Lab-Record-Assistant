@@ -60,6 +60,8 @@ public class AttachmentStorageService {
         catch (IOException e) { throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "FILE_READ_FAILED", "附件读取失败"); }
     }
 
+    public boolean exists(String key) { return Files.isRegularFile(resolve(key)); }
+
     public void deleteQuietly(String key) { try { Files.deleteIfExists(resolve(key)); } catch (IOException ignored) {} }
 
     private Path resolve(String key) {

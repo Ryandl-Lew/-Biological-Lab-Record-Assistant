@@ -1,0 +1,18 @@
+{
+  "allowedTools": [
+    "get_project_overview",
+    "get_record_overview",
+    "list_record_revisions",
+    "get_revision_summary",
+    "compare_record_revisions",
+    "list_review_feedback"
+  ],
+  "maxCallsByTool": {
+    "get_project_overview": 1,
+    "get_record_overview": 2,
+    "list_record_revisions": 2,
+    "get_revision_summary": 6,
+    "compare_record_revisions": 4,
+    "list_review_feedback": 2
+  }
+}

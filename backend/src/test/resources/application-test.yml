@@ -8,9 +8,14 @@ spring:
       ddl-auto: validate
   flyway:
     locations: classpath:db/migration
+agent:
+  enabled: false
+  provider: fake
+  model: fake-deterministic-v1
+  worker-poll-ms: 60000
 bionote:
+  restore-preview-secret: test-only-restore-preview-secret-with-at-least-32-characters
   jwt:
     secret: test-secret-with-at-least-thirty-two-characters-123456
     ttl-minutes: 5
   upload-root: ${java.io.tmpdir}/bionote-test-uploads
-

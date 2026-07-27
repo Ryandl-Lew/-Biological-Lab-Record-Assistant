@@ -8,7 +8,7 @@ import { updateRecord } from '@/api'
 vi.mock('@/api', () => ({
   fetchRecord: vi.fn().mockResolvedValue({ id: 'r1', projectId: 'p1', projectName: '项目', code: 'EXP-1', title: '未命名记录', experimentType: '未分类', experimentDate: '2026-07-23', purpose: '', provisional: true, fieldValues: {}, contentJson: {}, contentHtml: '', templateSnapshot: { name: '空白记录', fields: [] }, version: 0, capabilities: { canEdit: true, canSubmit: false } }),
   fetchAttachments: vi.fn().mockResolvedValue([]),
-  fetchRevisions: vi.fn().mockResolvedValue([]),
+  fetchRevisionSummaries: vi.fn().mockResolvedValue({ items: [], meta: { page: 0, size: 20, totalElements: 0, totalPages: 0 } }),
   discardRecordReservation: vi.fn(),
   updateRecord: vi.fn().mockResolvedValue({ id: 'r1', projectId: 'p1', projectName: '项目', code: 'EXP-1', title: 'PCR', experimentType: 'PCR', experimentDate: '2026-07-23', purpose: '目的', provisional: false, fieldValues: {}, contentJson: {}, contentHtml: '', templateSnapshot: { name: '空白记录', fields: [] }, version: 1, currentRevisionNo: 0, capabilities: { canEdit: true, canSubmit: true } }),
 }))

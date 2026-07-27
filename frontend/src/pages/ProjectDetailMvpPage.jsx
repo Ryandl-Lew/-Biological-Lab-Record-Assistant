@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Archive, ArrowLeft, CalendarDays, CheckCircle2, CircleUserRound, FileCheck2, FolderPlus, Mail, Paperclip, UserPlus, Users } from 'lucide-react'
 import {
@@ -14,6 +14,8 @@ import {
 } from '@/api'
 import { Badge, Button, EmptyState, StatusBadge, Surface, Tabs } from '@/components/ui'
 import { PROJECT_ROLE_LABELS, PROJECT_ROLE_TONES } from '@/domain'
+
+const ProgressReportPanel = lazy(() => import('@/components/agent/ProgressReportPanel'))
 
 const EVENT_LABELS = {
   PROJECT_CREATED: '创建了项目',
@@ -35,9 +37,10 @@ const EVENT_LABELS = {
   RECORD_EXPORT_PREVIEW: '预览了记录报告',
   RECORD_EXPORT_MARKDOWN: '导出了 Markdown 报告',
   RECORD_EXPORT_PDF: '导出了 PDF 报告',
+  AGENT_RUN_SUCCEEDED: '生成了已验证的 Agent 报告',
 }
 
-const EVENT_FILTERS = ['', 'PROJECT_CREATED', 'PROJECT_ARCHIVED', 'INVITATION_CREATED', 'INVITATION_ACCEPTED', 'INVITATION_REJECTED', 'INVITATION_EXPIRED', 'MEMBER_ROLE_CHANGED', 'MEMBER_REMOVED', 'RECORD_CREATED', 'RECORD_DELETED', 'ATTACHMENT_UPLOADED', 'ATTACHMENT_DELETED', 'RECORD_SUBMITTED', 'REVIEW_CHANGES_REQUESTED', 'REVIEW_APPROVED', 'REVIEWER_REASSIGNED', 'RECORD_EXPORT_PREVIEW', 'RECORD_EXPORT_MARKDOWN', 'RECORD_EXPORT_PDF']
+const EVENT_FILTERS = ['', 'PROJECT_CREATED', 'PROJECT_ARCHIVED', 'INVITATION_CREATED', 'INVITATION_ACCEPTED', 'INVITATION_REJECTED', 'INVITATION_EXPIRED', 'MEMBER_ROLE_CHANGED', 'MEMBER_REMOVED', 'RECORD_CREATED', 'RECORD_DELETED', 'ATTACHMENT_UPLOADED', 'ATTACHMENT_DELETED', 'RECORD_SUBMITTED', 'REVIEW_CHANGES_REQUESTED', 'REVIEW_APPROVED', 'REVIEWER_REASSIGNED', 'RECORD_EXPORT_PREVIEW', 'RECORD_EXPORT_MARKDOWN', 'RECORD_EXPORT_PDF', 'AGENT_RUN_SUCCEEDED']
 
 const EVENT_ICONS = {
   PROJECT_CREATED: FolderPlus,
@@ -59,6 +62,7 @@ const EVENT_ICONS = {
   RECORD_EXPORT_PREVIEW: FileCheck2,
   RECORD_EXPORT_MARKDOWN: FileCheck2,
   RECORD_EXPORT_PDF: FileCheck2,
+  AGENT_RUN_SUCCEEDED: FileCheck2,
 }
 
 function formatBytes(value) {
@@ -153,6 +157,7 @@ export default function ProjectDetailMvpPage() {
     { key: 'records', label: `实验记录 ${project.recordCount}` },
     { key: 'timeline', label: '时间线' },
     { key: 'attachments', label: '附件汇总' },
+    { key: 'progress', label: '智能进展' },
   ]
 
   const invite = async (event) => {
@@ -165,6 +170,14 @@ export default function ProjectDetailMvpPage() {
     if (confirm('归档不可恢复。确认归档该项目？')) act(() => archiveProject(projectId))
   }
   const setTimelineFilter = (key, value) => setTimelineFilters((current) => ({ ...current, [key]: value, page: 0 }))
+  const setRunId = (run) => { const next = new URLSearchParams(searchParams); next.set('tab', 'progress'); if (run) next.set('run', run); else next.delete('run'); setSearchParams(next, { replace: true }) }
+  const navigateEvidence = (evidence) => {
+    if (evidence.type === 'RECORD') navigate(`/records/${evidence.recordId || evidence.id}`)
+    else if (evidence.type === 'REVISION') navigate(`/records/${evidence.recordId}?tab=history&revision=${evidence.revisionId || evidence.id}`)
+    else if (evidence.type === 'REVISION_DIFF') navigate(`/records/${evidence.recordId}?tab=history&from=${evidence.fromRevisionId}&to=${evidence.toRevisionId}`)
+    else if (evidence.type === 'REVIEW') navigate(`/records/${evidence.recordId}#record-review`)
+    else if (evidence.type === 'AUDIT_EVENT') changeTab('timeline')
+  }
 
   return (
     <section className="space-y-6">
@@ -190,6 +203,8 @@ export default function ProjectDetailMvpPage() {
       </Surface>}
 
       {tab === 'attachments' && <Surface title="记录附件汇总"><p className="mb-4 text-sm text-slate-500">这里只汇总记录附件，不提供项目级上传或删除。</p>{loadingTab ? <p className="py-8 text-center text-sm text-slate-400">加载附件中…</p> : attachments.items.length ? <div className="divide-y">{attachments.items.map((attachment) => <button id={`attachment-${attachment.id}`} key={attachment.id} onClick={() => navigate(`/records/${attachment.recordId}#attachment-${attachment.id}`)} className="flex w-full items-center gap-3 py-3 text-left"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-500"><Paperclip size={16} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{attachment.filename}</span><span className="block truncate text-xs text-slate-400">{attachment.recordCode} · {attachment.recordTitle} · {attachment.uploaderName}</span></span><span className="text-xs text-slate-400">{formatBytes(attachment.sizeBytes)}</span></button>)}</div> : <EmptyState icon={Paperclip} title="暂无记录附件" />}{attachments.meta?.totalPages > 1 && <div className="mt-4 flex justify-end gap-2"><Button size="sm" variant="secondary" disabled={attachmentPage === 0} onClick={() => setAttachmentPage((page) => page - 1)}>上一页</Button><Button size="sm" variant="secondary" disabled={attachmentPage + 1 >= attachments.meta.totalPages} onClick={() => setAttachmentPage((page) => page + 1)}>下一页</Button></div>}</Surface>}
+
+      {tab === 'progress' && <Suspense fallback={<p role="status" className="py-12 text-center text-slate-400">加载智能进展组件中…</p>}><ProgressReportPanel project={project} runId={searchParams.get('run')} onRunId={setRunId} onEvidence={navigateEvidence} /></Suspense>}
 
       {showInvite && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><form onSubmit={invite} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-pop"><h2 className="text-lg font-semibold">邀请项目成员</h2><p className="mt-1 text-sm text-slate-500">仅可邀请已注册邮箱；接受后默认成为编辑成员。</p><label htmlFor="invite-email" className="field-label mt-5">注册邮箱</label><input id="invite-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required className="input" /><div className="mt-6 flex justify-end gap-2"><Button variant="secondary" onClick={() => setShowInvite(false)}>取消</Button><Button type="submit" loading={busy}>发送邀请</Button></div></form></div>}
     </section>

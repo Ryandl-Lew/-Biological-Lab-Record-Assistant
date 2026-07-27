@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, Clock3, Save, Send, Trash2 } from 'lucide-react'
 import { Button, Surface } from '@/components/ui'
-import { discardRecordReservation, fetchAttachments, fetchRecord, fetchRevisions, updateRecord } from '@/api'
+import { discardRecordReservation, fetchAttachments, fetchRecord, fetchRevisionSummaries, updateRecord } from '@/api'
 import RichTextEditor from '@/components/record/RichTextEditor'
 import AttachmentManager from '@/components/record/AttachmentManager'
 import SubmissionDialog from '@/components/record/SubmissionDialog'
@@ -23,6 +23,7 @@ function TemplateField({ field, value, onChange, attachments = [] }) {
 export default function RecordEditorMvpPage() {
   const { recordId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const [record, setRecord] = useState(null), [project, setProject] = useState(null), [template, setTemplate] = useState(null)
   const [form, setForm] = useState(empty), [dirty, setDirty] = useState(false), [state, setState] = useState('未保存'), [error, setError] = useState(''), [conflict, setConflict] = useState(false)
   const [attachments, setAttachments] = useState([]), [revisions, setRevisions] = useState([]), [submitOpen, setSubmitOpen] = useState(false)
@@ -37,7 +38,7 @@ export default function RecordEditorMvpPage() {
     setState(value.provisional ? '首次保存前' : '已保存')
     if (!value.provisional) setLastSavedAt(new Date())
   }, [])
-  const loadRelated = useCallback(async (id) => { const [files, history] = await Promise.all([fetchAttachments(id), fetchRevisions(id)]); setAttachments(files); setRevisions(history) }, [])
+  const loadRelated = useCallback(async (id) => { const [files, history] = await Promise.all([fetchAttachments(id), fetchRevisionSummaries(id)]); setAttachments(files); setRevisions(history.items) }, [])
   const loadExisting = useCallback(async () => { try { const value = await fetchRecord(recordId); hydrate(value); setProject({ id: value.projectId, name: value.projectName }); await loadRelated(recordId) } catch (requestError) { setError(requestError.message) } }, [hydrate, loadRelated, recordId])
   useEffect(() => { if (recordId) loadExisting(); else setError('缺少记录编号，请返回创建流程重新选择项目与模板') }, [loadExisting, recordId])
   useEffect(() => { const before = (event) => { if (dirty) { event.preventDefault(); event.returnValue = '' } }; window.addEventListener('beforeunload', before); return () => window.removeEventListener('beforeunload', before) }, [dirty])
@@ -78,7 +79,7 @@ export default function RecordEditorMvpPage() {
     if (dirty && !confirm('舍弃本次尚未保存的编辑？')) return
     navigate(`/records/${record.id}`)
   }
-  const latestReview = revisions.at(-1)?.review
+  const latestReview = revisions[0]?.review
   const saving = state.includes('保存中')
   if (!record && !error) return <p className="py-16 text-center text-sm text-slate-400">加载编辑器中…</p>
   if (!record) return <Surface title="无法打开编辑器"><p className="text-sm text-red-600">{error}</p><Button className="mt-4" onClick={() => navigate('/records/new')}>返回创建流程</Button></Surface>
@@ -86,8 +87,9 @@ export default function RecordEditorMvpPage() {
   return <section className="space-y-5">
     <button type="button" onClick={cancel} className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900"><ArrowLeft size={15}/>{record.provisional ? '返回创建流程' : '返回记录详情'}</button>
     <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-brand-600">实验记录编辑器</p><h1 className="mt-1 text-2xl font-bold">{record.provisional ? '填写新记录' : record.title}</h1><p className="mt-2 text-sm text-slate-500">{project?.name} · {record.code} · {record.templateSnapshot?.name || '空白结构'}</p></div><span className={`rounded-full px-3 py-1 text-xs font-medium ${state === '保存失败' || state === '版本冲突' ? 'bg-red-50 text-red-700' : dirty ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>{state}</span></div>
+    {location.state?.restoreMessage && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{location.state.restoreMessage}</p>}
     {error && <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-    {record?.status === 'CHANGES_REQUESTED' && latestReview && <Surface title={`R${revisions.at(-1).revisionNo} 审核意见`} className="mb-6 border-amber-200 bg-amber-50"><p className="text-sm text-amber-900">{latestReview.decisionComment}</p></Surface>}
+    {record?.status === 'CHANGES_REQUESTED' && latestReview && <Surface title={`R${revisions[0].revisionNo} 审核意见`} className="mb-6 border-amber-200 bg-amber-50"><p className="text-sm text-amber-900">{latestReview.decisionComment}</p></Surface>}
     <form onSubmit={save} className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr),340px]"><div className="space-y-6"><Surface title="基本信息"><div className="grid gap-4 md:grid-cols-2">
         <div><label className="field-label">实验名称<span className="text-red-500"> *</span></label><input aria-label="实验名称" value={form.title} onChange={(e) => change('title', e.target.value)} maxLength={255} required className="input" /></div>
         <div><label className="field-label">实验类型<span className="text-red-500"> *</span></label><input aria-label="实验类型" value={form.experimentType} onChange={(e) => change('experimentType', e.target.value)} maxLength={100} required className="input" /></div>

@@ -20,7 +20,32 @@ management:
     web:
       exposure:
         include: health,info
+revision:
+  diff:
+    max-text-chars: ${REVISION_DIFF_MAX_TEXT_CHARS:100000}
+    max-hunks: ${REVISION_DIFF_MAX_HUNKS:500}
+    max-sections: ${REVISION_DIFF_MAX_SECTIONS:500}
+agent:
+  enabled: ${AGENT_ENABLED:false}
+  provider: ${AGENT_PROVIDER:fake}
+  base-url: ${AGENT_BASE_URL:}
+  api-key: ${AGENT_API_KEY:}
+  model: ${AGENT_MODEL:fake-deterministic-v1}
+  timeout-ms: ${AGENT_TIMEOUT_MS:30000}
+  worker-poll-ms: ${AGENT_WORKER_POLL_MS:1000}
+  worker-stale-timeout-ms: ${AGENT_WORKER_STALE_TIMEOUT_MS:600000}
+  max-steps: ${AGENT_MAX_STEPS:30}
+  max-tool-calls: ${AGENT_MAX_TOOL_CALLS:12}
+  max-model-calls: ${AGENT_MAX_MODEL_CALLS:6}
+  max-duration-ms: ${AGENT_MAX_DURATION_MS:120000}
+  max-output-tokens: ${AGENT_MAX_OUTPUT_TOKENS:2000}
+  max-repair-turns: ${AGENT_MAX_REPAIR_TURNS:1}
+  max-concurrent-per-user: ${AGENT_MAX_CONCURRENT_PER_USER:2}
+  max-concurrent-per-project: ${AGENT_MAX_CONCURRENT_PER_PROJECT:2}
+  same-subject-cooldown-seconds: ${AGENT_SAME_SUBJECT_COOLDOWN_SECONDS:60}
+  progress-stale-days: ${AGENT_PROGRESS_STALE_DAYS:14}
 bionote:
+  restore-preview-secret: ${RESTORE_PREVIEW_SECRET:dev-only-restore-preview-secret-change-before-production-123456}
   jwt:
     secret: ${JWT_SECRET:dev-only-change-this-secret-before-production-123456}
     ttl-minutes: ${JWT_TTL_MINUTES:120}

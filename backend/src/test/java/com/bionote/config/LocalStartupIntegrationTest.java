@@ -9,9 +9,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:file:./target/local-startup-test/bionote-rich-seed-v8;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH",
+        "spring.datasource.url=jdbc:h2:file:./target/local-startup-test/bionote-rich-seed-v12-final;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH",
         "bionote.dev-seed-enabled=true",
-        "bionote.upload-root=${java.io.tmpdir}/bionote-local-startup-v8-uploads"
+        "bionote.upload-root=${java.io.tmpdir}/bionote-local-startup-v12-final-uploads"
 })
 class LocalStartupIntegrationTest {
     @Autowired Environment environment;
@@ -33,8 +33,9 @@ class LocalStartupIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM experiment_records WHERE status='IN_REVIEW'", Long.class)).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM experiment_records WHERE status='CHANGES_REQUESTED'", Long.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM experiment_records WHERE status='IN_PROGRESS'", Long.class)).isEqualTo(3);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM attachments", Long.class)).isEqualTo(5);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM record_revisions", Long.class)).isEqualTo(9);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM attachments", Long.class)).isEqualTo(6);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM record_revisions", Long.class)).isEqualTo(10);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM experiment_records r WHERE r.status='CHANGES_REQUESTED' AND r.current_revision_no=2", Long.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM projects p WHERE (SELECT COUNT(*) FROM audit_events a WHERE a.project_id=p.id) >= 10", Long.class)).isEqualTo(4);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM template_fields WHERE template_id='10000000-0000-0000-0000-000000000001'", Long.class)).isEqualTo(14);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM template_fields WHERE template_id='10000000-0000-0000-0000-000000000002'", Long.class)).isEqualTo(16);
