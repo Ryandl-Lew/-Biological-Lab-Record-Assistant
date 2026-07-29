@@ -1,0 +1,5 @@
+base_url (OpenAI):https://api.deepseek.com
+base_url (Anthropic):https://api.deepseek.com/anthropic
+
+api_key:sk-c2ac2b0908b74ad9adee0ed7f9c0c1a3
+model*:deepseek-v4-flash

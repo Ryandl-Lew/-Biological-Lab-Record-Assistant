@@ -1,0 +1,123 @@
+/**
+ * 全局样式
+ * ----------------------------------------------------------------------------
+ * 技术栈：Tailwind CSS。设计令牌见 tailwind.config.js（brand 蓝色系、阴影、动画）。
+ * 本文件只保留：全局基底、滚动条 / 选区、少量复用频繁的组件类。
+ * 页面与组件样式一律使用 Tailwind 工具类，不再维护独立 CSS 文件。
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ------------------------------- 全局基底 ------------------------------- */
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-slate-50 font-sans text-sm leading-relaxed text-slate-900;
+  }
+
+  ::selection {
+    @apply bg-brand-200 text-brand-900;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-slate-300;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400;
+  }
+}
+
+/* ----------------------------- 复用组件类 ----------------------------- */
+@layer components {
+  /* 文本输入通用样式 */
+  .input {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm
+      text-slate-900 placeholder:text-slate-400 outline-none transition
+      focus:border-brand-500 focus:shadow-glow disabled:cursor-not-allowed
+      disabled:bg-slate-50;
+  }
+
+  /* 表单标签 */
+  .field-label {
+    @apply mb-1.5 block text-sm font-medium text-slate-700;
+  }
+
+  /* 数据表格容器 */
+  .table-wrap {
+    @apply overflow-x-auto rounded-lg border border-slate-200;
+  }
+
+  /* 数据表格 */
+  .data-table {
+    @apply w-full text-sm;
+  }
+  .data-table thead th {
+    @apply whitespace-nowrap border-b border-slate-200 bg-slate-50 px-4 py-3
+      text-left text-xs font-semibold text-slate-500;
+  }
+  .data-table tbody td {
+    @apply border-b border-slate-100 px-4 py-3.5 align-middle text-slate-700;
+  }
+  .data-table tbody tr {
+    @apply transition-colors hover:bg-slate-50;
+  }
+  .data-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .rich-editor:empty::before {
+    content: attr(data-placeholder);
+    @apply pointer-events-none text-slate-300;
+  }
+
+  .bionote-rich-editor .ProseMirror h2 {
+    @apply mb-3 mt-7 border-b border-slate-200 pb-2 text-xl font-semibold text-slate-900;
+  }
+  .bionote-rich-editor .ProseMirror h3 {
+    @apply mb-2 mt-6 text-lg font-semibold text-slate-900;
+  }
+  .bionote-rich-editor .ProseMirror p {
+    @apply my-3;
+  }
+  .bionote-rich-editor .ProseMirror ul {
+    @apply my-3 list-disc space-y-1 pl-6;
+  }
+  .bionote-rich-editor .ProseMirror ol {
+    @apply my-3 list-decimal space-y-1 pl-6;
+  }
+  .bionote-rich-editor .ProseMirror blockquote {
+    @apply my-4 border-l-4 border-brand-300 bg-brand-50/60 px-4 py-2 italic text-slate-600;
+  }
+  .bionote-rich-editor .ProseMirror code {
+    @apply rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[0.9em] text-rose-700;
+  }
+  .bionote-rich-editor .ProseMirror pre {
+    @apply my-4 overflow-x-auto rounded-lg bg-slate-900 p-4 text-slate-100;
+  }
+  .bionote-rich-editor .ProseMirror pre code {
+    @apply bg-transparent p-0 text-inherit;
+  }
+  .bionote-rich-editor .ProseMirror a {
+    @apply cursor-pointer text-brand-600 underline decoration-brand-300 underline-offset-2;
+  }
+  .bionote-rich-editor .ProseMirror hr {
+    @apply my-6 border-slate-200;
+  }
+  .bionote-rich-editor .ProseMirror.ProseMirror-focused {
+    @apply bg-white;
+  }
+}

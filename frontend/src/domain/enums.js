@@ -1,0 +1,12 @@
+export const PROJECT_ROLE_LABELS = { OWNER: '项目负责人', MEMBER: '编辑成员', REVIEWER: '审核者' }
+export const PROJECT_ROLE_TONES = { OWNER: 'blue', MEMBER: 'green', REVIEWER: 'amber' }
+export const PROJECT_STATUS_LABELS = { ACTIVE: '进行中', ARCHIVED: '已归档' }
+export const PROJECT_STATUS_TONES = { ACTIVE: 'blue', ARCHIVED: 'gray' }
+export const RECORD_STATUS_LABELS = { IN_PROGRESS: '进行中', IN_REVIEW: '审核中', CHANGES_REQUESTED: '需修改', COMPLETED: '已完成' }
+export const RECORD_STATUS_TONES = { IN_PROGRESS: 'blue', IN_REVIEW: 'amber', CHANGES_REQUESTED: 'red', COMPLETED: 'green' }
+export const TEMPLATE_FIELD_TYPE_LABELS = { SINGLE_LINE_TEXT: '单行文本', MULTI_LINE_TEXT: '多行文本', NUMBER: '数字', DATE: '日期', SELECT: '单选/下拉', FILE: '文件' }
+export const TEMPLATE_CATEGORY_LABELS = { all: '全部模板', mine: '我的模板', molecular: '分子生物学', cell: '细胞生物学', protein: '蛋白实验', immunology: '免疫实验' }
+export const SEARCH_ENTITY_LABELS = { PROJECT: '项目', RECORD: '实验记录', TEMPLATE: '模板', MEMBER: '成员', ATTACHMENT: '附件' }
+export const SEARCH_ENTITY_TONES = { PROJECT: 'violet', RECORD: 'amber', TEMPLATE: 'green', MEMBER: 'blue', ATTACHMENT: 'blue' }
+export const PERMISSION_VALUE_LABELS = { yes: '是', no: '否', optional: '可选' }
+export const PERMISSION_VALUE_TONES = { yes: 'green', no: 'red', optional: 'amber' }

@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "required": ["summary", "evidence"],
+  "properties": {
+    "summary": { "type": "string", "minLength": 1 },
+    "evidence": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}
