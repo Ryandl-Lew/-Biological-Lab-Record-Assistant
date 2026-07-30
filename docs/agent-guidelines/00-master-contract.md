@@ -169,4 +169,3 @@ README.md                 一键启动、测试和演示说明
 - 新增页面在常见桌面和约 768px 宽度下可用。
 - `frontend npm run build`、前端测试、`backend mvn test` 全部通过。
 - 不存在业务 mock、静态假成功、默认测试 Token、硬编码用户 ID 或仓库中的真实密钥。
-

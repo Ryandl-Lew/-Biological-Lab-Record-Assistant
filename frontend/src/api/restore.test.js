@@ -11,7 +11,10 @@ describe('restore api', () => {
   it('sends preview and execute through the shared client', async () => {
     const input = { sourceRevisionId: 'rev-1', expectedRecordVersion: 7, restoreAttachments: true }
     await previewRestore('record-1', input)
-    expect(request).toHaveBeenCalledWith('/records/record-1/restore-preview', { method: 'POST', body: JSON.stringify(input) })
+    expect(request).toHaveBeenCalledWith('/records/record-1/restore-preview', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
     await executeRestore('record-1', { ...input, previewToken: 'signed' }, 'idempotency-key')
     expect(request).toHaveBeenLastCalledWith('/records/record-1/restore', {
       method: 'POST',

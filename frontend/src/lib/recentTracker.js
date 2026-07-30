@@ -70,7 +70,11 @@ export function clearRecent() {
  * 供测试使用的重置工具（不对外暴露语义）
  */
 export function __resetRecentTracker() {
-  try { localStorage.removeItem(STORAGE_KEY) } catch { /* noop */ }
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    /* noop */
+  }
 }
 
 /**
@@ -86,8 +90,15 @@ export async function trackVisitByPath(pathname) {
   if (m && m[1] !== 'new') {
     try {
       const record = await fetchRecord(m[1])
-      recordVisit({ type: 'record', id: record.id, title: record.title, subTitle: record.projectName })
-    } catch { /* 记录可能被删除，静默 */ }
+      recordVisit({
+        type: 'record',
+        id: record.id,
+        title: record.title,
+        subTitle: record.projectName,
+      })
+    } catch {
+      /* 记录可能被删除，静默 */
+    }
     return
   }
 
@@ -96,7 +107,14 @@ export async function trackVisitByPath(pathname) {
   if (m) {
     try {
       const project = await fetchProject(m[1])
-      recordVisit({ type: 'project', id: project.id, title: project.name, subTitle: project.status })
-    } catch { /* 项目可能被归档，静默 */ }
+      recordVisit({
+        type: 'project',
+        id: project.id,
+        title: project.name,
+        subTitle: project.status,
+      })
+    } catch {
+      /* 项目可能被归档，静默 */
+    }
   }
 }

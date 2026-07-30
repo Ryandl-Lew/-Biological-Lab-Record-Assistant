@@ -77,16 +77,16 @@ V12 已实际应用到 MySQL 8.4，`flyway_schema_history.success=1`。迁移后
 
 ## 最终实际测试
 
-| 验收 | 实际结果 |
-|---|---|
-| `backend\\.\\mvnw.cmd test` | 94 tests，0 failures，0 errors，1 skipped |
-| `backend\\.\\mvnw.cmd verify` | 94 tests，0 failures，0 errors，1 skipped；Jar 成功 |
-| `RealProviderSmokeTest`（显式联网） | 1 test，0 failures，0 errors |
-| `frontend\\npm.cmd run lint` | 通过 |
-| `frontend\\npm.cmd test -- --run` | 24 files / 39 tests 通过 |
-| `frontend\\npm.cmd run build` | 通过；1955 modules；主入口 484.12 kB |
-| `frontend\\npm.cmd run test:e2e` | Chromium 8/8 通过；最终重跑 42.5 秒 |
-| `git diff --check` | 通过 |
+| 验收                                | 实际结果                                            |
+| ----------------------------------- | --------------------------------------------------- |
+| `backend\\.\\mvnw.cmd test`         | 94 tests，0 failures，0 errors，1 skipped           |
+| `backend\\.\\mvnw.cmd verify`       | 94 tests，0 failures，0 errors，1 skipped；Jar 成功 |
+| `RealProviderSmokeTest`（显式联网） | 1 test，0 failures，0 errors                        |
+| `frontend\\npm.cmd run lint`        | 通过                                                |
+| `frontend\\npm.cmd test -- --run`   | 24 files / 39 tests 通过                            |
+| `frontend\\npm.cmd run build`       | 通过；1955 modules；主入口 484.12 kB                |
+| `frontend\\npm.cmd run test:e2e`    | Chromium 8/8 通过；最终重跑 42.5 秒                 |
+| `git diff --check`                  | 通过                                                |
 
 默认全量测试中跳过的 1 项正是 `RealProviderSmokeTest`，因为默认测试必须离线且不能读取真实密钥。该测试已在显式注入本机 `llm` 配置后单独实际通过。
 

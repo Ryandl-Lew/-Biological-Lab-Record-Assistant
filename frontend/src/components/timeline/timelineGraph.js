@@ -10,10 +10,15 @@ const PALETTE = [
 const TRUNK = { bg: 'bg-blue-500', stroke: '#3b82f6', light: 'bg-blue-50', name: 'blue' }
 
 const BRANCH_COMMIT_TYPES = new Set([
-  'ATTACHMENT_UPLOADED', 'ATTACHMENT_DELETED',
-  'RECORD_SUBMITTED', 'REVIEW_CHANGES_REQUESTED', 'REVIEWER_REASSIGNED',
+  'ATTACHMENT_UPLOADED',
+  'ATTACHMENT_DELETED',
+  'RECORD_SUBMITTED',
+  'REVIEW_CHANGES_REQUESTED',
+  'REVIEWER_REASSIGNED',
   'RECORD_REVISION_RESTORED',
-  'RECORD_EXPORT_PREVIEW', 'RECORD_EXPORT_MARKDOWN', 'RECORD_EXPORT_PDF',
+  'RECORD_EXPORT_PREVIEW',
+  'RECORD_EXPORT_MARKDOWN',
+  'RECORD_EXPORT_PDF',
 ])
 
 function sortEvents(events) {
@@ -28,12 +33,12 @@ export function buildTimelineGraph(rawEvents) {
   const nodes = []
   const forks = []
   const merges = []
-  const branchStates = new Map()   // recordId -> { lane, closed }
+  const branchStates = new Map() // recordId -> { lane, closed }
   const laneNodes = new Map()
   laneNodes.set(0, [])
-  const freeLanes = []        // sorted ascending – smallest freed index first
+  const freeLanes = [] // sorted ascending – smallest freed index first
   const closedLanes = new Set()
-  const recordColors = new Map()   // recordId → palette entry
+  const recordColors = new Map() // recordId → palette entry
   let nextLane = 1
   let nextColorIndex = 0
 
@@ -118,17 +123,20 @@ export function buildTimelineGraph(rawEvents) {
     }
 
     // Branch commit events (with open record lane)
-    const isBranchCommit = (BRANCH_COMMIT_TYPES.has(eventType) ||
-      (eventType === 'AGENT_RUN_SUCCEEDED' && recordId))
+    const isBranchCommit =
+      BRANCH_COMMIT_TYPES.has(eventType) || (eventType === 'AGENT_RUN_SUCCEEDED' && recordId)
     if (isBranchCommit && recordId) {
       const state = branchStates.get(recordId)
       if (state && !state.closed) {
         // Aggregation: consecutive same (eventType, actorId) on same lane
         const prevNodes = laneNodes.get(state.lane)
         const prev = prevNodes[prevNodes.length - 1]
-        if (prev && prev.type === 'commit' &&
-            prev.events[0].eventType === eventType &&
-            prev.events[0].actorId === actorId) {
+        if (
+          prev &&
+          prev.type === 'commit' &&
+          prev.events[0].eventType === eventType &&
+          prev.events[0].actorId === actorId
+        ) {
           prev.events.push(event)
           continue
         }
@@ -146,14 +154,18 @@ export function buildTimelineGraph(rawEvents) {
 
   // Assign row indices (oldest = 0)
   const totalRows = nodes.length
-  nodes.forEach((node, index) => { node.row = index })
+  nodes.forEach((node, index) => {
+    node.row = index
+  })
 
   // Build fork edges: from each trunk 'fork' node to the first commit on its lane
   const forkNodes = nodes.filter((n) => n.type === 'fork')
   for (const forkNode of forkNodes) {
     const state = branchStates.get(forkNode.recordId)
     if (state) {
-      const laneCommits = laneNodes.get(state.lane).filter((n) => n.type === 'commit' && n.recordId === forkNode.recordId)
+      const laneCommits = laneNodes
+        .get(state.lane)
+        .filter((n) => n.type === 'commit' && n.recordId === forkNode.recordId)
       if (laneCommits.length) {
         forks.push({ from: forkNode, to: laneCommits[0] })
       }
@@ -164,7 +176,9 @@ export function buildTimelineGraph(rawEvents) {
   for (const merge of merges) {
     const state = branchStates.get(merge.recordId)
     if (state) {
-      const laneCommits = laneNodes.get(state.lane).filter((n) => n.type === 'commit' && n.recordId === merge.recordId)
+      const laneCommits = laneNodes
+        .get(state.lane)
+        .filter((n) => n.type === 'commit' && n.recordId === merge.recordId)
       if (laneCommits.length) {
         const lastCommit = laneCommits[laneCommits.length - 1]
         if (lastCommit.row < merge.to.row) {
@@ -180,7 +194,9 @@ export function buildTimelineGraph(rawEvents) {
     const lnodes = laneNodes.get(index)
     if (!lnodes || !lnodes.length) continue
     const lastNode = lnodes[lnodes.length - 1]
-    const isOpen = index > 0 && lastNode.type === 'commit' &&
+    const isOpen =
+      index > 0 &&
+      lastNode.type === 'commit' &&
       [...branchStates.values()].some((s) => s.lane === index && !s.closed)
 
     if (index === 0) {
@@ -199,7 +215,12 @@ export function buildTimelineGraph(rawEvents) {
     let seg = null
     for (const node of lnodes) {
       if (!seg || seg.recordId !== node.recordId) {
-        seg = { fromRow: node.row, toRow: node.row, recordId: node.recordId, color: recordColors.get(node.recordId) || PALETTE[0] }
+        seg = {
+          fromRow: node.row,
+          toRow: node.row,
+          recordId: node.recordId,
+          color: recordColors.get(node.recordId) || PALETTE[0],
+        }
         segments.push(seg)
       } else {
         seg.toRow = node.row
@@ -243,7 +264,12 @@ export function graphNodeContext(node) {
   if (!events || !events.length) return ''
   const first = events[0]
   const meta = first.metadata || {}
-  if (node.type === 'trunk' || node.type === 'fork' || node.type === 'merge' || node.type === 'terminus') {
+  if (
+    node.type === 'trunk' ||
+    node.type === 'fork' ||
+    node.type === 'merge' ||
+    node.type === 'terminus'
+  ) {
     if (node.recordId) return meta.title || meta.code || meta.name || meta.filename || ''
   }
   return ''

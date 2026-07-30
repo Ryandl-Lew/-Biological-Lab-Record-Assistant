@@ -71,9 +71,11 @@ export default function TopbarMvp({ onMenuClick }) {
   }
 
   const markReadLocally = (id) => {
-    setItems((current) => current.map((item) => (
-      item.id === id && !item.readAt ? { ...item, readAt: new Date().toISOString() } : item
-    )))
+    setItems((current) =>
+      current.map((item) =>
+        item.id === id && !item.readAt ? { ...item, readAt: new Date().toISOString() } : item,
+      ),
+    )
     setUnread((current) => Math.max(0, current - 1))
   }
 
@@ -123,10 +125,12 @@ export default function TopbarMvp({ onMenuClick }) {
     try {
       await markAllNotificationsRead()
       setUnread(0)
-      setItems((current) => current.map((item) => ({
-        ...item,
-        readAt: item.readAt || new Date().toISOString(),
-      })))
+      setItems((current) =>
+        current.map((item) => ({
+          ...item,
+          readAt: item.readAt || new Date().toISOString(),
+        })),
+      )
     } catch (requestError) {
       setError(requestError.message)
     } finally {
@@ -136,40 +140,96 @@ export default function TopbarMvp({ onMenuClick }) {
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center border-b border-slate-200/80 bg-white/75 px-4 backdrop-blur-md sm:px-6 lg:px-8">
-      <button onClick={onMenuClick} aria-label="打开导航菜单" className="rounded-lg p-2 text-slate-500 lg:hidden"><Menu size={20} /></button>
+      <button
+        onClick={onMenuClick}
+        aria-label="打开导航菜单"
+        className="rounded-lg p-2 text-slate-500 lg:hidden"
+      >
+        <Menu size={20} />
+      </button>
       <div className="relative ml-auto">
-        <button aria-label={`通知，${unread} 条未读`} aria-expanded={open} onClick={toggle} className="relative rounded-lg p-2.5 text-slate-500 hover:bg-slate-100">
+        <button
+          aria-label={`通知，${unread} 条未读`}
+          aria-expanded={open}
+          onClick={toggle}
+          className="relative rounded-lg p-2.5 text-slate-500 hover:bg-slate-100"
+        >
           <Bell size={18} />
-          {unread > 0 && <span className="absolute -right-0.5 -top-0.5 rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{unread}</span>}
+          {unread > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              {unread}
+            </span>
+          )}
         </button>
         {open && (
           <div className="absolute right-0 top-12 z-50 w-[380px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-pop">
             <div className="flex items-center justify-between border-b p-4">
-              <div><h2 className="text-sm font-semibold">通知</h2><p className="text-xs text-slate-400">{unread} 条未读</p></div>
-              <button disabled={loading || unread === 0} onClick={markAllRead} className="inline-flex items-center gap-1 text-xs text-brand-600 disabled:text-slate-300"><CheckCheck size={14} />全部已读</button>
+              <div>
+                <h2 className="text-sm font-semibold">通知</h2>
+                <p className="text-xs text-slate-400">{unread} 条未读</p>
+              </div>
+              <button
+                disabled={loading || unread === 0}
+                onClick={markAllRead}
+                className="inline-flex items-center gap-1 text-xs text-brand-600 disabled:text-slate-300"
+              >
+                <CheckCheck size={14} />
+                全部已读
+              </button>
             </div>
-            {error && <p role="alert" className="border-b bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+            {error && (
+              <p role="alert" className="border-b bg-red-50 p-3 text-sm text-red-700">
+                {error}
+              </p>
+            )}
             <div className="max-h-[420px] divide-y overflow-y-auto">
-              {loading && items.length === 0 && <p className="p-8 text-center text-sm text-slate-400">加载通知中…</p>}
-              {!loading && items.length === 0 && !error && <p className="p-8 text-center text-sm text-slate-400">暂无通知</p>}
+              {loading && items.length === 0 && (
+                <p className="p-8 text-center text-sm text-slate-400">加载通知中…</p>
+              )}
+              {!loading && items.length === 0 && !error && (
+                <p className="p-8 text-center text-sm text-slate-400">暂无通知</p>
+              )}
               {items.map((item) => (
                 <div key={item.id} className={`p-4 ${item.readAt ? '' : 'bg-brand-50/40'}`}>
                   <button onClick={() => openNotification(item)} className="w-full text-left">
                     <span className="text-sm font-medium">{item.title}</span>
                     <span className="mt-1 block text-xs text-slate-500">{item.body}</span>
-                    <span className="mt-1 block text-[11px] text-slate-400">{new Date(item.createdAt).toLocaleString()}</span>
+                    <span className="mt-1 block text-[11px] text-slate-400">
+                      {new Date(item.createdAt).toLocaleString()}
+                    </span>
                   </button>
-                  {item.type === 'PROJECT_INVITATION' && (item.stale || item.actions?.length === 0 ? (
-                    <p className="mt-2 text-xs text-slate-400">已处理或不可访问</p>
-                  ) : (
-                    <div className="mt-3 flex gap-2">
-                      <button disabled={busyId === item.id} onClick={() => handleInvitation(item, 'ACCEPT')} className="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">接受</button>
-                      <button disabled={busyId === item.id} onClick={() => handleInvitation(item, 'REJECT')} className="rounded-md border px-3 py-1.5 text-xs disabled:opacity-50">拒绝</button>
-                    </div>
-                  ))}
+                  {item.type === 'PROJECT_INVITATION' &&
+                    (item.stale || item.actions?.length === 0 ? (
+                      <p className="mt-2 text-xs text-slate-400">已处理或不可访问</p>
+                    ) : (
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          disabled={busyId === item.id}
+                          onClick={() => handleInvitation(item, 'ACCEPT')}
+                          className="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                        >
+                          接受
+                        </button>
+                        <button
+                          disabled={busyId === item.id}
+                          onClick={() => handleInvitation(item, 'REJECT')}
+                          className="rounded-md border px-3 py-1.5 text-xs disabled:opacity-50"
+                        >
+                          拒绝
+                        </button>
+                      </div>
+                    ))}
                 </div>
               ))}
-              {hasMore && <button disabled={loading} onClick={() => loadNotifications(page + 1, true)} className="w-full p-3 text-center text-xs font-medium text-brand-600 disabled:text-slate-300">{loading ? '加载中…' : '查看更多'}</button>}
+              {hasMore && (
+                <button
+                  disabled={loading}
+                  onClick={() => loadNotifications(page + 1, true)}
+                  className="w-full p-3 text-center text-xs font-medium text-brand-600 disabled:text-slate-300"
+                >
+                  {loading ? '加载中…' : '查看更多'}
+                </button>
+              )}
             </div>
           </div>
         )}

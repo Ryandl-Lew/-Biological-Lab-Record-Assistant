@@ -4,16 +4,6 @@ import com.bionote.attachment.AttachmentStorage;
 import com.bionote.common.ApiException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellType;
-import org.apache.poi.ss.usermodel.DataFormatter;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Component;
-
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -23,6 +13,15 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DataFormatter;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
 
 @Component
 public class PointExtractor {
@@ -43,23 +42,33 @@ public class PointExtractor {
     public Extracted extract(List<Map<String, Object>> records, FitModels.FitIntent intent) {
         List<FitModels.DataPoint> points = new ArrayList<>();
         List<FitModels.SkipInfo> skipped = new ArrayList<>();
-        String source = intent.pointSource() == null ? "AUTO" : intent.pointSource().trim().toUpperCase(Locale.ROOT);
+        String source =
+                intent.pointSource() == null
+                        ? "AUTO"
+                        : intent.pointSource().trim().toUpperCase(Locale.ROOT);
         String xSpec = blankToNull(intent.xSpec());
         String ySpec = blankToNull(intent.ySpec());
         if (xSpec == null || ySpec == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "FIT_MISSING_MAPPING", "请指定 x 与 y 对应的字段名或表格列名/列号");
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST, "FIT_MISSING_MAPPING", "请指定 x 与 y 对应的字段名或表格列名/列号");
         }
         for (Map<String, Object> record : records) {
             UUID id = UUID.fromString(record.get("id").toString());
             String code = String.valueOf(record.get("code"));
             try {
                 if (useTabularAttachment(source, xSpec, ySpec)) {
-                    List<FitModels.DataPoint> tablePoints = fromTabularAttachment(record, id, code, xSpec, ySpec, intent.csvNameHint());
-                    if (tablePoints.isEmpty()) skipped.add(new FitModels.SkipInfo(id, code, "表格附件中未找到可用数据点"));
+                    List<FitModels.DataPoint> tablePoints =
+                            fromTabularAttachment(
+                                    record, id, code, xSpec, ySpec, intent.csvNameHint());
+                    if (tablePoints.isEmpty())
+                        skipped.add(new FitModels.SkipInfo(id, code, "表格附件中未找到可用数据点"));
                     else points.addAll(tablePoints);
                 } else {
                     FitModels.DataPoint point = fromFields(record, id, code, xSpec, ySpec);
-                    if (point == null) skipped.add(new FitModels.SkipInfo(id, code, "字段缺少有效数值: " + xSpec + "/" + ySpec));
+                    if (point == null)
+                        skipped.add(
+                                new FitModels.SkipInfo(
+                                        id, code, "字段缺少有效数值: " + xSpec + "/" + ySpec));
                     else points.add(point);
                 }
             } catch (ApiException e) {
@@ -79,12 +88,14 @@ public class PointExtractor {
     }
 
     private boolean looksLikeColumnSpec(String xSpec, String ySpec) {
-        return xSpec.matches("\\d+") || ySpec.matches("\\d+")
+        return xSpec.matches("\\d+")
+                || ySpec.matches("\\d+")
                 || xSpec.toLowerCase(Locale.ROOT).contains("col")
                 || ySpec.toLowerCase(Locale.ROOT).contains("col");
     }
 
-    private FitModels.DataPoint fromFields(Map<String, Object> record, UUID id, String code, String xSpec, String ySpec) {
+    private FitModels.DataPoint fromFields(
+            Map<String, Object> record, UUID id, String code, String xSpec, String ySpec) {
         JsonNode values;
         try {
             values = json.readTree(String.valueOf(record.get("field_values_json")));
@@ -97,15 +108,22 @@ public class PointExtractor {
         return new FitModels.DataPoint(x, y, id, code, "TEMPLATE_FIELDS");
     }
 
-    private List<FitModels.DataPoint> fromTabularAttachment(Map<String, Object> record, UUID id, String code,
-                                                            String xSpec, String ySpec, String nameHint) {
-        List<Map<String,Object>> attachments=fitStore.findTabularAttachments(id);
+    private List<FitModels.DataPoint> fromTabularAttachment(
+            Map<String, Object> record,
+            UUID id,
+            String code,
+            String xSpec,
+            String ySpec,
+            String nameHint) {
+        List<Map<String, Object>> attachments = fitStore.findTabularAttachments(id);
         if (attachments.isEmpty()) return List.of();
         Map<String, Object> chosen = attachments.get(0);
         if (nameHint != null && !nameHint.isBlank()) {
             String hint = nameHint.toLowerCase(Locale.ROOT);
             for (Map<String, Object> row : attachments) {
-                if (String.valueOf(row.get("original_filename")).toLowerCase(Locale.ROOT).contains(hint)) {
+                if (String.valueOf(row.get("original_filename"))
+                        .toLowerCase(Locale.ROOT)
+                        .contains(hint)) {
                     chosen = row;
                     break;
                 }
@@ -126,14 +144,16 @@ public class PointExtractor {
 
     private LoadedTable loadTable(Map<String, Object> record, String nameHint) {
         String id = String.valueOf(record.get("id"));
-        List<Map<String,Object>> attachments=fitStore.findTabularAttachments(UUID.fromString(id));
+        List<Map<String, Object>> attachments =
+                fitStore.findTabularAttachments(UUID.fromString(id));
         if (attachments.isEmpty()) return null;
         Map<String, Object> chosen = attachments.get(0);
         if (nameHint != null && !nameHint.isBlank()) {
             String hint = nameHint.toLowerCase(Locale.ROOT);
             for (Map<String, Object> row : attachments) {
                 String name = String.valueOf(row.get("original_filename")).toLowerCase(Locale.ROOT);
-                if (name.contains(hint) || hint.contains(name.replace(".xlsx", "").replace(".csv", ""))) {
+                if (name.contains(hint)
+                        || hint.contains(name.replace(".xlsx", "").replace(".csv", ""))) {
                     chosen = row;
                     break;
                 }
@@ -151,7 +171,8 @@ public class PointExtractor {
                 if (workbook.getNumberOfSheets() <= 0) return null;
                 rows = readSheetRows(workbook.getSheetAt(0));
             } catch (Exception e) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "FIT_EXCEL_PARSE_FAILED", "无法解析 Excel 附件");
+                throw new ApiException(
+                        HttpStatus.BAD_REQUEST, "FIT_EXCEL_PARSE_FAILED", "无法解析 Excel 附件");
             }
         } else {
             rows = csvRows(new String(bytes, StandardCharsets.UTF_8));
@@ -159,7 +180,8 @@ public class PointExtractor {
         return new LoadedTable(filename, rows);
     }
 
-    private MatrixSlice matrixFromRows(List<String[]> rows, List<String> xCols, String yCol, boolean timeToMinutes) {
+    private MatrixSlice matrixFromRows(
+            List<String[]> rows, List<String> xCols, String yCol, boolean timeToMinutes) {
         if (rows.isEmpty()) return new MatrixSlice(new double[0][], new double[0]);
         String[] header = rows.get(0);
         int start = isHeader(header) ? 1 : 0;
@@ -168,13 +190,17 @@ public class PointExtractor {
             xIndex[i] = columnIndex(header, xCols.get(i));
             if (xIndex[i] < 0 && start == 0) xIndex[i] = parseIndex(xCols.get(i), header.length);
             if (xIndex[i] < 0) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "FIT_CSV_COLUMN_MISSING", "找不到自变量列: " + xCols.get(i));
+                throw new ApiException(
+                        HttpStatus.BAD_REQUEST,
+                        "FIT_CSV_COLUMN_MISSING",
+                        "找不到自变量列: " + xCols.get(i));
             }
         }
         int yIndex = columnIndex(header, yCol);
         if (yIndex < 0 && start == 0) yIndex = parseIndex(yCol, header.length);
         if (yIndex < 0) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "FIT_CSV_COLUMN_MISSING", "找不到因变量列: " + yCol);
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST, "FIT_CSV_COLUMN_MISSING", "找不到因变量列: " + yCol);
         }
 
         boolean[] timeFlags = new boolean[xCols.size()];
@@ -186,7 +212,10 @@ public class PointExtractor {
         java.util.Arrays.fill(timeOrigin, Double.NaN);
         boolean anyTime = false;
         for (boolean flag : timeFlags) {
-            if (flag) { anyTime = true; break; }
+            if (flag) {
+                anyTime = true;
+                break;
+            }
         }
         if (anyTime) {
             for (int r = start; r < rows.size(); r++) {
@@ -194,7 +223,8 @@ public class PointExtractor {
                 for (int i = 0; i < xCols.size(); i++) {
                     if (!timeFlags[i] || row.length <= xIndex[i]) continue;
                     Double minutes = parseTimeToMinutes(row[xIndex[i]]);
-                    if (minutes != null && (Double.isNaN(timeOrigin[i]) || minutes < timeOrigin[i])) {
+                    if (minutes != null
+                            && (Double.isNaN(timeOrigin[i]) || minutes < timeOrigin[i])) {
                         timeOrigin[i] = minutes;
                     }
                 }
@@ -211,16 +241,25 @@ public class PointExtractor {
             double[] x = new double[xCols.size()];
             boolean ok = true;
             for (int i = 0; i < xCols.size(); i++) {
-                if (row.length <= xIndex[i]) { ok = false; break; }
+                if (row.length <= xIndex[i]) {
+                    ok = false;
+                    break;
+                }
                 Double value;
                 if (timeFlags[i]) {
                     Double minutes = parseTimeToMinutes(row[xIndex[i]]);
-                    if (minutes == null || Double.isNaN(timeOrigin[i])) { ok = false; break; }
+                    if (minutes == null || Double.isNaN(timeOrigin[i])) {
+                        ok = false;
+                        break;
+                    }
                     value = minutes - timeOrigin[i];
                 } else {
                     value = parseDouble(row[xIndex[i]]);
                 }
-                if (value == null) { ok = false; break; }
+                if (value == null) {
+                    ok = false;
+                    break;
+                }
                 x[i] = value;
             }
             if (!ok) continue;
@@ -249,7 +288,9 @@ public class PointExtractor {
             if (plain >= 0 && plain < 2) return plain * 24 * 60;
             return plain;
         }
-        Matcher hourLabel = Pattern.compile("(?i)^(\\d+(?:\\.\\d+)?)\\s*(?:h|hr|hrs|hour|hours|小时)$").matcher(text);
+        Matcher hourLabel =
+                Pattern.compile("(?i)^(\\d+(?:\\.\\d+)?)\\s*(?:h|hr|hrs|hour|hours|小时)$")
+                        .matcher(text);
         if (hourLabel.matches()) {
             return Double.parseDouble(hourLabel.group(1)) * 60.0;
         }
@@ -260,7 +301,10 @@ public class PointExtractor {
             int s = matcher.group(3) == null ? 0 : Integer.parseInt(matcher.group(3));
             return h * 60.0 + m + s / 60.0;
         }
-        matcher = Pattern.compile("(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})[ T](\\d{1,2}):(\\d{2})(?::(\\d{2}))?").matcher(text);
+        matcher =
+                Pattern.compile(
+                                "(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})[ T](\\d{1,2}):(\\d{2})(?::(\\d{2}))?")
+                        .matcher(text);
         if (matcher.find()) {
             int hour = Integer.parseInt(matcher.group(4));
             int minute = Integer.parseInt(matcher.group(5));
@@ -272,21 +316,25 @@ public class PointExtractor {
         return null;
     }
 
-    public List<FitModels.DataPoint> parseCsv(String text, UUID id, String code, String xSpec, String ySpec) {
+    public List<FitModels.DataPoint> parseCsv(
+            String text, UUID id, String code, String xSpec, String ySpec) {
         return parseCsv(text, id, code, xSpec, ySpec, false);
     }
 
-    List<FitModels.DataPoint> parseCsv(String text, UUID id, String code, String xSpec, String ySpec, boolean timeToMinutes) {
+    List<FitModels.DataPoint> parseCsv(
+            String text, UUID id, String code, String xSpec, String ySpec, boolean timeToMinutes) {
         List<String[]> rows = csvRows(text);
         if (rows.isEmpty()) return List.of();
         return pointsFromRows(rows, id, code, xSpec, ySpec, "CSV_ATTACHMENT", timeToMinutes);
     }
 
-    public List<FitModels.DataPoint> parseXlsx(byte[] bytes, UUID id, String code, String xSpec, String ySpec) {
+    public List<FitModels.DataPoint> parseXlsx(
+            byte[] bytes, UUID id, String code, String xSpec, String ySpec) {
         return parseXlsx(bytes, id, code, xSpec, ySpec, false);
     }
 
-    List<FitModels.DataPoint> parseXlsx(byte[] bytes, UUID id, String code, String xSpec, String ySpec, boolean timeToMinutes) {
+    List<FitModels.DataPoint> parseXlsx(
+            byte[] bytes, UUID id, String code, String xSpec, String ySpec, boolean timeToMinutes) {
         try (Workbook workbook = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
             if (workbook.getNumberOfSheets() <= 0) return List.of();
             Sheet sheet = workbook.getSheetAt(0);
@@ -296,15 +344,23 @@ public class PointExtractor {
         } catch (ApiException e) {
             throw e;
         } catch (Exception e) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "FIT_EXCEL_PARSE_FAILED", "无法解析 Excel 附件（仅支持 .xlsx 首个工作表）");
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "FIT_EXCEL_PARSE_FAILED",
+                    "无法解析 Excel 附件（仅支持 .xlsx 首个工作表）");
         }
     }
 
     /**
-     * Build design matrix for multivariate / multi-y fitting from the first matching tabular attachment.
+     * Build design matrix for multivariate / multi-y fitting from the first matching tabular
+     * attachment.
      */
-    public MatrixExtract extractMatrix(List<Map<String, Object>> records, String nameHint,
-                                       List<String> xCols, String yCol, boolean timeToMinutes) {
+    public MatrixExtract extractMatrix(
+            List<Map<String, Object>> records,
+            String nameHint,
+            List<String> xCols,
+            String yCol,
+            boolean timeToMinutes) {
         if (records == null || records.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "FIT_NO_RECORDS", "未找到符合范围的实验记录");
         }
@@ -340,7 +396,10 @@ public class PointExtractor {
         return new MatrixExtract(xCols, yCol, x, y, used, skipped);
     }
 
-    /** Peek first-row headers (or synthetic col0.. for headerless sheets). Best-effort, never throws. */
+    /**
+     * Peek first-row headers (or synthetic col0.. for headerless sheets). Best-effort, never
+     * throws.
+     */
     public List<String> peekHeaders(byte[] bytes, String filename) {
         try {
             String name = filename == null ? "" : filename.toLowerCase(Locale.ROOT);
@@ -426,10 +485,17 @@ public class PointExtractor {
         return rows;
     }
 
-    private List<FitModels.DataPoint> pointsFromRows(List<String[]> rows, UUID id, String code,
-                                                     String xSpec, String ySpec, String sourceLabel,
-                                                     boolean timeToMinutes) {
-        MatrixSlice slice = matrixFromRows(rows, List.of(xSpec), ySpec, timeToMinutes || looksLikeTimeColumn(xSpec));
+    private List<FitModels.DataPoint> pointsFromRows(
+            List<String[]> rows,
+            UUID id,
+            String code,
+            String xSpec,
+            String ySpec,
+            String sourceLabel,
+            boolean timeToMinutes) {
+        MatrixSlice slice =
+                matrixFromRows(
+                        rows, List.of(xSpec), ySpec, timeToMinutes || looksLikeTimeColumn(xSpec));
         List<FitModels.DataPoint> points = new ArrayList<>();
         for (int i = 0; i < slice.y.length; i++) {
             points.add(new FitModels.DataPoint(slice.x[i][0], slice.y[i], id, code, sourceLabel));
@@ -521,8 +587,7 @@ public class PointExtractor {
             double[][] x,
             double[] y,
             List<String> usedRecordCodes,
-            List<FitModels.SkipInfo> skipped
-    ) {}
+            List<FitModels.SkipInfo> skipped) {}
 
     private record LoadedTable(String filename, List<String[]> rows) {}
 

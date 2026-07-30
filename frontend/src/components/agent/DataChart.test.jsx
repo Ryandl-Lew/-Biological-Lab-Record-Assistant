@@ -10,7 +10,15 @@ describe('DataChart', () => {
         title="测试柱状图"
         xLabel="浓度"
         yLabel="Ct"
-        series={[{ name: 'Ct', points: [{ x: 1, y: 2, label: 'A' }, { x: 2, y: 4, label: 'B' }] }]}
+        series={[
+          {
+            name: 'Ct',
+            points: [
+              { x: 1, y: 2, label: 'A' },
+              { x: 2, y: 4, label: 'B' },
+            ],
+          },
+        ]}
       />,
     )
     expect(screen.getByRole('img', { name: '测试柱状图' })).toBeInTheDocument()
@@ -21,7 +29,10 @@ describe('DataChart', () => {
     const chart = chartFromFit({
       equation: 'y=a+b*x',
       points: [{ x: 1, y: 2, recordCode: 'R1' }],
-      curveSample: [{ x: 1, y: 2.1 }, { x: 2, y: 3.1 }],
+      curveSample: [
+        { x: 1, y: 2.1 },
+        { x: 2, y: 3.1 },
+      ],
     })
     expect(chart.type).toBe('scatter')
     expect(chart.series).toHaveLength(2)

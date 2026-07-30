@@ -51,9 +51,7 @@ export default function AuthLayout({ title, subtitle, children, footer }) {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.15] text-white backdrop-blur">
               <FlaskConical size={21} strokeWidth={2.2} />
             </div>
-            <span className="text-lg font-bold tracking-tight text-white">
-              BioNote
-            </span>
+            <span className="text-lg font-bold tracking-tight text-white">BioNote</span>
           </div>
 
           {/* 主视觉文案 */}
@@ -64,8 +62,7 @@ export default function AuthLayout({ title, subtitle, children, footer }) {
               都有迹可循
             </h1>
             <p className="mt-4 text-[15px] leading-relaxed text-brand-100">
-              BioNote 是专为生物科研团队打造的电子实验记录本，
-              帮助你规范记录、高效检索、安心协作。
+              BioNote 是专为生物科研团队打造的电子实验记录本， 帮助你规范记录、高效检索、安心协作。
             </p>
           </div>
 
@@ -101,22 +98,16 @@ export default function AuthLayout({ title, subtitle, children, footer }) {
           </div>
 
           <div className="animate-fade-in-up">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-              {title}
-            </h2>
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900">{title}</h2>
             <p className="mt-1.5 text-sm text-slate-500">{subtitle}</p>
 
             <div className="mt-8">{children}</div>
           </div>
 
-          {footer && (
-            <div className="mt-8 text-center text-sm text-slate-500">{footer}</div>
-          )}
+          {footer && <div className="mt-8 text-center text-sm text-slate-500">{footer}</div>}
         </div>
 
-        <p className="py-6 text-center text-xs text-slate-400">
-          © 2026 BioNote · 生物实验记录助手
-        </p>
+        <p className="py-6 text-center text-xs text-slate-400">© 2026 BioNote · 生物实验记录助手</p>
       </div>
     </div>
   )

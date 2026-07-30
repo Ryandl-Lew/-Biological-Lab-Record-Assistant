@@ -16,6 +16,15 @@ import com.bionote.agent.tool.bionote.BioNoteAgentReadService;
 import com.bionote.common.ApiException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.http.HttpClient;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -27,20 +36,10 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
-import java.net.http.HttpClient;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-
 @Service
 public class RecordChatService implements AgentChatUseCase {
-    private static final String RECORD_SYSTEM = """
+    private static final String RECORD_SYSTEM =
+            """
             You are BioNote's read-only assistant for one experiment record.
             Answer from the provided record context, chat history, and available tools.
             Available tools:
@@ -53,7 +52,8 @@ public class RecordChatService implements AgentChatUseCase {
             Reply in the user's language. Keep answers concise and practical.
             """;
 
-    private static final String PROJECT_SYSTEM = """
+    private static final String PROJECT_SYSTEM =
+            """
             You are BioNote's read-only assistant for one collaboration project.
             Use the provided tools to explore data, read files, plot charts, and fit curves.
 
@@ -90,10 +90,18 @@ public class RecordChatService implements AgentChatUseCase {
     private final AgentToolRegistry toolRegistry;
     private final ChatSessionStore sessions;
 
-    public RecordChatService(AgentProperties properties, AgentCredentialService credentials, AgentChatContextStore contextStore,
-                             ObjectMapper json, CurveFitService curveFits, FitProposalResolver proposals,
-                             AgentChatReferenceService chatReferences, ChartPlotService charts,
-                             BioNoteAgentReadService agentReads, AgentToolRegistry toolRegistry, ChatSessionStore sessions) {
+    public RecordChatService(
+            AgentProperties properties,
+            AgentCredentialService credentials,
+            AgentChatContextStore contextStore,
+            ObjectMapper json,
+            CurveFitService curveFits,
+            FitProposalResolver proposals,
+            AgentChatReferenceService chatReferences,
+            ChartPlotService charts,
+            BioNoteAgentReadService agentReads,
+            AgentToolRegistry toolRegistry,
+            ChatSessionStore sessions) {
         this.properties = properties;
         this.credentials = credentials;
         this.contextStore = contextStore;
@@ -106,6 +114,7 @@ public class RecordChatService implements AgentChatUseCase {
         this.toolRegistry = toolRegistry;
         this.sessions = sessions;
     }
+
     public AgentDtos.ChatReply chat(UUID actor, UUID recordId, AgentDtos.ChatRequest request) {
         requireEnabled();
         Map<String, Object> record = requireVisibleRecord(actor, recordId);
@@ -113,83 +122,209 @@ public class RecordChatService implements AgentChatUseCase {
         String context = buildRecordContext(record);
 
         AgentCredentials creds = credentials.resolve(actor);
-        return complete(creds, RECORD_SYSTEM, "RECORD_CONTEXT", context, parsed,
-                fakeRecordReply(record, parsed.message(), creds), null, null, null, null, null, actor, null, recordId);
+        return complete(
+                creds,
+                RECORD_SYSTEM,
+                "RECORD_CONTEXT",
+                context,
+                parsed,
+                fakeRecordReply(record, parsed.message(), creds),
+                null,
+                null,
+                null,
+                null,
+                null,
+                actor,
+                null,
+                recordId);
     }
 
-    public AgentDtos.ChatReply chatAboutProject(UUID actor, UUID projectId, AgentDtos.ChatRequest request) {
+    public AgentDtos.ChatReply chatAboutProject(
+            UUID actor, UUID projectId, AgentDtos.ChatRequest request) {
         requireEnabled();
         Map<String, Object> project = requireVisibleProject(actor, projectId);
         ParsedChat parsed = parseRequest(request);
         String context = buildProjectContext(project);
         List<FitModels.CatalogRecord> catalog = curveFits.buildFitCatalog(projectId);
         String catalogText = curveFits.formatFitCatalog(catalog);
-        context = context + "\n\nFIT_DATA_CATALOG:\n" + catalogText
-                + "\nEQUATION_CATALOG:\n" + FitMethodCatalog.catalogDescription();
+        context =
+                context
+                        + "\n\nFIT_DATA_CATALOG:\n"
+                        + catalogText
+                        + "\nEQUATION_CATALOG:\n"
+                        + FitMethodCatalog.catalogDescription();
 
         if (request.fitConfirm() != null) {
-            return executeConfirmedFit(actor, projectId, project, parsed, context, request.fitConfirm());
+            return executeConfirmedFit(
+                    actor, projectId, project, parsed, context, request.fitConfirm());
         }
 
         AgentCredentials creds = credentials.resolve(actor);
 
         AgentDtos.ChatReply fake = fakeProjectReply(project, parsed.message(), null, creds);
-        return complete(creds, PROJECT_SYSTEM, "PROJECT_CONTEXT", context, parsed, fake, null, null, null, null, null, actor, projectId, null);
+        return complete(
+                creds,
+                PROJECT_SYSTEM,
+                "PROJECT_CONTEXT",
+                context,
+                parsed,
+                fake,
+                null,
+                null,
+                null,
+                null,
+                null,
+                actor,
+                projectId,
+                null);
     }
 
-    private AgentDtos.ChatReply executeConfirmedFit(UUID actor, UUID projectId, Map<String, Object> project,
-                                                   ParsedChat parsed, String context, AgentDtos.FitProposalView confirm) {
+    private AgentDtos.ChatReply executeConfirmedFit(
+            UUID actor,
+            UUID projectId,
+            Map<String, Object> project,
+            ParsedChat parsed,
+            String context,
+            AgentDtos.FitProposalView confirm) {
         AgentCredentials creds = credentials.resolve(actor);
         FitModels.FitProposal proposal = fromProposalView(confirm);
         try {
-            List<FitModels.FitResult> results = curveFits.fitProposalAll(actor, projectId, proposal);
+            List<FitModels.FitResult> results =
+                    curveFits.fitProposalAll(actor, projectId, proposal);
             List<AgentDtos.FitView> fitViews = results.stream().map(this::toFitView).toList();
             AgentDtos.FitView primary = fitViews.isEmpty() ? null : fitViews.get(0);
             AgentDtos.ChartView chart = charts.fromFit(primary);
-            String fitContext = "\n\nFIT_RESULTS:\n" + write(fitViews)
-                    + (chart == null ? "" : "\n\nCHART:\n" + write(chart));
-            AgentDtos.ChatReply fake = fakeProjectReply(project, parsed.message(), primary, fitViews, creds);
-            return complete(creds, PROJECT_SYSTEM, "PROJECT_CONTEXT", context + fitContext, parsed, fake, primary, fitViews, null, null, chart, actor, projectId, null);
+            String fitContext =
+                    "\n\nFIT_RESULTS:\n"
+                            + write(fitViews)
+                            + (chart == null ? "" : "\n\nCHART:\n" + write(chart));
+            AgentDtos.ChatReply fake =
+                    fakeProjectReply(project, parsed.message(), primary, fitViews, creds);
+            return complete(
+                    creds,
+                    PROJECT_SYSTEM,
+                    "PROJECT_CONTEXT",
+                    context + fitContext,
+                    parsed,
+                    fake,
+                    primary,
+                    fitViews,
+                    null,
+                    null,
+                    chart,
+                    actor,
+                    projectId,
+                    null);
         } catch (ApiException e) {
             String message = e.getMessage() == null ? "拟合失败" : e.getMessage();
-            if ("invalid number".equalsIgnoreCase(message) || message.toLowerCase(Locale.ROOT).contains("invalid number")) {
+            if ("invalid number".equalsIgnoreCase(message)
+                    || message.toLowerCase(Locale.ROOT).contains("invalid number")) {
                 message = "数据或方程无法解析为数值。若时间列为时刻，请说明“转换为分钟”；多元回归请用列名列表而非 y=a+b1*x1+... 省略式。";
             }
-            return new AgentDtos.ChatReply(message, displayProvider(creds), displayModel(creds), null, null, null, null, null, null);
+            return new AgentDtos.ChatReply(
+                    message,
+                    displayProvider(creds),
+                    displayModel(creds),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
         }
     }
 
-    private AgentDtos.ChatReply complete(AgentCredentials creds, String system, String contextLabel, String context,
-                                        ParsedChat parsed, AgentDtos.ChatReply fakeReply, AgentDtos.FitView fit,
-                                        List<AgentDtos.FitView> fits, AgentDtos.FitProposalView proposal,
-                                        AgentDtos.AnalysisTemplateView analysisTemplate, AgentDtos.ChartView chart) {
-        return complete(creds, system, contextLabel, context, parsed, fakeReply, fit, fits, proposal, analysisTemplate, chart, null, null, null);
+    private AgentDtos.ChatReply complete(
+            AgentCredentials creds,
+            String system,
+            String contextLabel,
+            String context,
+            ParsedChat parsed,
+            AgentDtos.ChatReply fakeReply,
+            AgentDtos.FitView fit,
+            List<AgentDtos.FitView> fits,
+            AgentDtos.FitProposalView proposal,
+            AgentDtos.AnalysisTemplateView analysisTemplate,
+            AgentDtos.ChartView chart) {
+        return complete(
+                creds,
+                system,
+                contextLabel,
+                context,
+                parsed,
+                fakeReply,
+                fit,
+                fits,
+                proposal,
+                analysisTemplate,
+                chart,
+                null,
+                null,
+                null);
     }
 
-    private AgentDtos.ChatReply complete(AgentCredentials creds, String system, String contextLabel, String context,
-                                        ParsedChat parsed, AgentDtos.ChatReply fakeReply, AgentDtos.FitView fit,
-                                        List<AgentDtos.FitView> fits, AgentDtos.FitProposalView proposal,
-                                        AgentDtos.AnalysisTemplateView analysisTemplate, AgentDtos.ChartView chart,
-                                        UUID actor, UUID projectId, UUID recordId) {
+    private AgentDtos.ChatReply complete(
+            AgentCredentials creds,
+            String system,
+            String contextLabel,
+            String context,
+            ParsedChat parsed,
+            AgentDtos.ChatReply fakeReply,
+            AgentDtos.FitView fit,
+            List<AgentDtos.FitView> fits,
+            AgentDtos.FitProposalView proposal,
+            AgentDtos.AnalysisTemplateView analysisTemplate,
+            AgentDtos.ChartView chart,
+            UUID actor,
+            UUID projectId,
+            UUID recordId) {
         String provider = displayProvider(creds);
         String model = displayModel(creds);
         if ("fake".equalsIgnoreCase(provider)) {
-            if (fit != null || proposal != null || analysisTemplate != null || chart != null
+            if (fit != null
+                    || proposal != null
+                    || analysisTemplate != null
+                    || chart != null
                     || (fits != null && !fits.isEmpty())) {
-                return new AgentDtos.ChatReply(fakeReply.reply(), fakeReply.provider(), fakeReply.model(),
-                        fit, fits, proposal, analysisTemplate, chart, null);
+                return new AgentDtos.ChatReply(
+                        fakeReply.reply(),
+                        fakeReply.provider(),
+                        fakeReply.model(),
+                        fit,
+                        fits,
+                        proposal,
+                        analysisTemplate,
+                        chart,
+                        null);
             }
             return fakeReply;
         }
         if (blank(creds.baseUrl()) || blank(creds.apiKey()) || blank(model)) {
-            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "MODEL_PROVIDER_UNAVAILABLE",
+            throw new ApiException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "MODEL_PROVIDER_UNAVAILABLE",
                     "llm 配置不完整，请检查 base_url (OpenAI)、api_key 和 model");
         }
-        var result = completeOpenAiCompatible(creds, system, contextLabel, context, parsed.history(), parsed.message(), model, actor, projectId, recordId);
-        return new AgentDtos.ChatReply(result.reply, provider, model,
+        var result =
+                completeOpenAiCompatible(
+                        creds,
+                        system,
+                        contextLabel,
+                        context,
+                        parsed.history(),
+                        parsed.message(),
+                        model,
+                        actor,
+                        projectId,
+                        recordId);
+        return new AgentDtos.ChatReply(
+                result.reply,
+                provider,
+                model,
                 result.fit != null ? result.fit : fit,
                 result.fits != null ? result.fits : fits,
-                proposal, analysisTemplate,
+                proposal,
+                analysisTemplate,
                 result.chart != null ? result.chart : chart,
                 result.systemError);
     }
@@ -201,12 +336,20 @@ public class RecordChatService implements AgentChatUseCase {
         return new ParsedChat(message, normalizeHistory(request.history()));
     }
 
-    private AgentDtos.ChatReply fakeRecordReply(Map<String, Object> record, String message, AgentCredentials creds) {
+    private AgentDtos.ChatReply fakeRecordReply(
+            Map<String, Object> record, String message, AgentCredentials creds) {
         String code = String.valueOf(record.get("code"));
         String title = String.valueOf(record.get("title"));
         return new AgentDtos.ChatReply(
-                "【本地 fake 回复】我已读取记录 " + code + "《" + title + "》。你问的是：" + limit(message, 200)
-                        + "。当前状态为 " + record.get("status") + "。真实模型未启用时仅返回确定性演示答复。",
+                "【本地 fake 回复】我已读取记录 "
+                        + code
+                        + "《"
+                        + title
+                        + "》。你问的是："
+                        + limit(message, 200)
+                        + "。当前状态为 "
+                        + record.get("status")
+                        + "。真实模型未启用时仅返回确定性演示答复。",
                 "fake",
                 displayModel(creds),
                 null,
@@ -217,85 +360,167 @@ public class RecordChatService implements AgentChatUseCase {
                 null);
     }
 
-    private AgentDtos.ChatReply fakeProposalReply(Map<String, Object> project, AgentDtos.FitProposalView proposal,
-                                                 AgentCredentials creds) {
+    private AgentDtos.ChatReply fakeProposalReply(
+            Map<String, Object> project,
+            AgentDtos.FitProposalView proposal,
+            AgentCredentials creds) {
         String mode;
         if (Boolean.TRUE.equals(proposal.multivariate())) {
             mode = "多元线性回归";
         } else if (proposal.autoCompare()) {
-            mode = "多模型比选（" + String.join("/", proposal.candidateIds() == null ? List.of() : proposal.candidateIds()) + "）";
+            mode =
+                    "多模型比选（"
+                            + String.join(
+                                    "/",
+                                    proposal.candidateIds() == null
+                                            ? List.of()
+                                            : proposal.candidateIds())
+                            + "）";
         } else {
             mode = "单方程 " + proposal.equation();
         }
-        String reply = "【本地 fake 回复】已为项目《" + project.get("name") + "》拟定拟合方案，请确认后再执行。"
-                + "模式：" + mode
-                + "；x=" + proposal.xSpec() + "，y=" + proposal.ySpec()
-                + "；来源=" + proposal.pointSource()
-                + (proposal.csvNameHint() == null ? "" : "；csv=" + proposal.csvNameHint())
-                + (Boolean.TRUE.equals(proposal.timeToMinutes()) ? "；时间列将转换为相对分钟" : "")
-                + "。" + (proposal.rationale() == null ? "" : proposal.rationale())
-                + " 点击「确认拟合」继续。";
-        return new AgentDtos.ChatReply(reply, "fake", displayModel(creds), null, null, proposal, null, null, null);
+        String reply =
+                "【本地 fake 回复】已为项目《"
+                        + project.get("name")
+                        + "》拟定拟合方案，请确认后再执行。"
+                        + "模式："
+                        + mode
+                        + "；x="
+                        + proposal.xSpec()
+                        + "，y="
+                        + proposal.ySpec()
+                        + "；来源="
+                        + proposal.pointSource()
+                        + (proposal.csvNameHint() == null ? "" : "；csv=" + proposal.csvNameHint())
+                        + (Boolean.TRUE.equals(proposal.timeToMinutes()) ? "；时间列将转换为相对分钟" : "")
+                        + "。"
+                        + (proposal.rationale() == null ? "" : proposal.rationale())
+                        + " 点击「确认拟合」继续。";
+        return new AgentDtos.ChatReply(
+                reply, "fake", displayModel(creds), null, null, proposal, null, null, null);
     }
 
-    private AgentDtos.ChatReply fakeChartReply(Map<String, Object> project, AgentDtos.ChartView chart,
-                                              AgentCredentials creds) {
-        int n = chart.series() == null || chart.series().isEmpty() || chart.series().get(0).points() == null
-                ? 0 : chart.series().get(0).points().size();
-        String reply = "【本地 fake 回复】已根据项目《" + project.get("name") + "》中的真实数据生成"
-                + chart.title() + "（" + n + " 个数据点）。图表由抽取引擎计算，未由模型编造数值。";
-        return new AgentDtos.ChatReply(reply, "fake", displayModel(creds), null, null, null, null, chart, null);
+    private AgentDtos.ChatReply fakeChartReply(
+            Map<String, Object> project, AgentDtos.ChartView chart, AgentCredentials creds) {
+        int n =
+                chart.series() == null
+                                || chart.series().isEmpty()
+                                || chart.series().get(0).points() == null
+                        ? 0
+                        : chart.series().get(0).points().size();
+        String reply =
+                "【本地 fake 回复】已根据项目《"
+                        + project.get("name")
+                        + "》中的真实数据生成"
+                        + chart.title()
+                        + "（"
+                        + n
+                        + " 个数据点）。图表由抽取引擎计算，未由模型编造数值。";
+        return new AgentDtos.ChatReply(
+                reply, "fake", displayModel(creds), null, null, null, null, chart, null);
     }
 
-    private AgentDtos.ChatReply fakeProjectReply(Map<String, Object> project, String message, AgentDtos.FitView fit,
-                                                 AgentCredentials creds) {
+    private AgentDtos.ChatReply fakeProjectReply(
+            Map<String, Object> project,
+            String message,
+            AgentDtos.FitView fit,
+            AgentCredentials creds) {
         return fakeProjectReply(project, message, fit, fit == null ? null : List.of(fit), creds);
     }
 
-    private AgentDtos.ChatReply fakeProjectReply(Map<String, Object> project, String message,
-                                                AgentDtos.FitView fit, List<AgentDtos.FitView> fits,
-                                                AgentCredentials creds) {
+    private AgentDtos.ChatReply fakeProjectReply(
+            Map<String, Object> project,
+            String message,
+            AgentDtos.FitView fit,
+            List<AgentDtos.FitView> fits,
+            AgentCredentials creds) {
         String reply;
         if (fit != null) {
             int count = fits == null ? 1 : fits.size();
-            reply = "【本地 fake 回复】已完成项目《" + project.get("name") + "》的确定性拟合（共 " + count + " 个结果）。"
-                    + "首个方程 " + fit.equation() + "，n=" + fit.n()
-                    + "，R²=" + String.format("%.4f", fit.rSquared())
-                    + "，RMSE=" + String.format("%.4f", fit.rmse())
-                    + "。参数：" + fit.parameters() + "。以下数值来自拟合引擎，未由模型编造。";
+            reply =
+                    "【本地 fake 回复】已完成项目《"
+                            + project.get("name")
+                            + "》的确定性拟合（共 "
+                            + count
+                            + " 个结果）。"
+                            + "首个方程 "
+                            + fit.equation()
+                            + "，n="
+                            + fit.n()
+                            + "，R²="
+                            + String.format("%.4f", fit.rSquared())
+                            + "，RMSE="
+                            + String.format("%.4f", fit.rmse())
+                            + "。参数："
+                            + fit.parameters()
+                            + "。以下数值来自拟合引擎，未由模型编造。";
         } else {
-            reply = "【本地 fake 回复】我已读取项目《" + project.get("name") + "》。你问的是：" + limit(message, 200)
-                    + "。项目状态为 " + project.get("status") + "。真实模型未启用时仅返回确定性演示答复。";
+            reply =
+                    "【本地 fake 回复】我已读取项目《"
+                            + project.get("name")
+                            + "》。你问的是："
+                            + limit(message, 200)
+                            + "。项目状态为 "
+                            + project.get("status")
+                            + "。真实模型未启用时仅返回确定性演示答复。";
         }
-        return new AgentDtos.ChatReply(reply, "fake", displayModel(creds), fit, fits, null, null, charts.fromFit(fit), null);
+        return new AgentDtos.ChatReply(
+                reply,
+                "fake",
+                displayModel(creds),
+                fit,
+                fits,
+                null,
+                null,
+                charts.fromFit(fit),
+                null);
     }
 
     private AgentDtos.FitView toFitView(FitModels.FitResult result) {
-        List<AgentDtos.FitSkipView> skipped = result.skipped().stream()
-                .map(s -> new AgentDtos.FitSkipView(s.recordCode(), s.reason()))
-                .toList();
-        List<AgentDtos.FitCurvePoint> curve = result.curveSample().stream()
-                .map(p -> new AgentDtos.FitCurvePoint(
-                        ((Number) p.get("x")).doubleValue(),
-                        ((Number) p.get("y")).doubleValue()))
-                .toList();
-        List<AgentDtos.FitPointView> points = result.points().stream()
-                .map(p -> new AgentDtos.FitPointView(
-                        ((Number) p.get("x")).doubleValue(),
-                        ((Number) p.get("y")).doubleValue(),
-                        String.valueOf(p.get("recordCode")),
-                        String.valueOf(p.get("source"))))
-                .toList();
-        List<AgentDtos.FitComparisonView> comparisons = result.comparisons().stream()
-                .map(c -> new AgentDtos.FitComparisonView(
-                        c.equation(),
-                        Double.isFinite(c.rSquared()) ? c.rSquared() : null,
-                        Double.isFinite(c.rmse()) ? c.rmse() : null,
-                        c.n(),
-                        c.selected()))
-                .toList();
-        return new AgentDtos.FitView(result.equation(), result.parameters(), result.rSquared(), result.rmse(),
-                result.n(), result.usedRecordCodes(), skipped, curve, points, comparisons);
+        List<AgentDtos.FitSkipView> skipped =
+                result.skipped().stream()
+                        .map(s -> new AgentDtos.FitSkipView(s.recordCode(), s.reason()))
+                        .toList();
+        List<AgentDtos.FitCurvePoint> curve =
+                result.curveSample().stream()
+                        .map(
+                                p ->
+                                        new AgentDtos.FitCurvePoint(
+                                                ((Number) p.get("x")).doubleValue(),
+                                                ((Number) p.get("y")).doubleValue()))
+                        .toList();
+        List<AgentDtos.FitPointView> points =
+                result.points().stream()
+                        .map(
+                                p ->
+                                        new AgentDtos.FitPointView(
+                                                ((Number) p.get("x")).doubleValue(),
+                                                ((Number) p.get("y")).doubleValue(),
+                                                String.valueOf(p.get("recordCode")),
+                                                String.valueOf(p.get("source"))))
+                        .toList();
+        List<AgentDtos.FitComparisonView> comparisons =
+                result.comparisons().stream()
+                        .map(
+                                c ->
+                                        new AgentDtos.FitComparisonView(
+                                                c.equation(),
+                                                Double.isFinite(c.rSquared()) ? c.rSquared() : null,
+                                                Double.isFinite(c.rmse()) ? c.rmse() : null,
+                                                c.n(),
+                                                c.selected()))
+                        .toList();
+        return new AgentDtos.FitView(
+                result.equation(),
+                result.parameters(),
+                result.rSquared(),
+                result.rmse(),
+                result.n(),
+                result.usedRecordCodes(),
+                skipped,
+                curve,
+                points,
+                comparisons);
     }
 
     private AgentDtos.FitProposalView toProposalView(FitModels.FitProposal proposal) {
@@ -313,8 +538,7 @@ public class RecordChatService implements AgentChatUseCase {
                 proposal.keyword(),
                 proposal.rationale(),
                 proposal.multivariate(),
-                proposal.timeToMinutes()
-        );
+                proposal.timeToMinutes());
     }
 
     private FitModels.FitProposal fromProposalView(AgentDtos.FitProposalView view) {
@@ -344,15 +568,18 @@ public class RecordChatService implements AgentChatUseCase {
                         || CurveFitService.splitSpecs(view.xSpec()).size() > 1
                         || CurveFitService.looksLikeMultivariateEquation(view.equation()),
                 Boolean.TRUE.equals(view.timeToMinutes())
-                        || (view.xSpec() != null && view.xSpec().contains("时间"))
-        );
+                        || (view.xSpec() != null && view.xSpec().contains("时间")));
     }
 
     private boolean isConfirmPhrase(String message) {
         if (message == null) return false;
         String text = message.trim().toLowerCase(Locale.ROOT);
-        return text.equals("确认") || text.equals("确认拟合") || text.equals("用这个")
-                || text.equals("按方案拟合") || text.contains("确认按拟定方案") || text.contains("进行拟合");
+        return text.equals("确认")
+                || text.equals("确认拟合")
+                || text.equals("用这个")
+                || text.equals("按方案拟合")
+                || text.contains("确认按拟定方案")
+                || text.contains("进行拟合");
     }
 
     /** Keep recent user turns so short replies like「对数」still inherit 自变量/因变量 mapping. */
@@ -390,11 +617,24 @@ public class RecordChatService implements AgentChatUseCase {
         }
     }
 
-    private CompletionResult completeOpenAiCompatible(AgentCredentials creds, String system, String contextLabel, String context,
-                                            List<AgentDtos.ChatMessage> history, String message, String model,
-                                            UUID actor, UUID projectId, UUID recordId) {
+    private CompletionResult completeOpenAiCompatible(
+            AgentCredentials creds,
+            String system,
+            String contextLabel,
+            String context,
+            List<AgentDtos.ChatMessage> history,
+            String message,
+            String model,
+            UUID actor,
+            UUID projectId,
+            UUID recordId) {
         List<Map<String, Object>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", system + "\n\n" + contextLabel + ":\n" + context));
+        messages.add(
+                Map.of(
+                        "role",
+                        "system",
+                        "content",
+                        system + "\n\n" + contextLabel + ":\n" + context));
         for (AgentDtos.ChatMessage item : history) {
             messages.add(Map.of("role", item.role(), "content", item.content()));
         }
@@ -414,63 +654,119 @@ public class RecordChatService implements AgentChatUseCase {
                 body.put("tools", chatToolDefinitions());
                 body.put("tool_choice", "auto");
             }
-            if (model.toLowerCase().startsWith("deepseek")) body.put("thinking", Map.of("type", "disabled"));
-            log.debug("LLM chat request: model={} messages={} tools={}", model, messages.size(), hasTools ? 2 : 0);
-            if (log.isTraceEnabled()) { try { log.trace("LLM chat request body: {}", json.writeValueAsString(body)); } catch (Exception ignored) {} }
+            if (model.toLowerCase().startsWith("deepseek"))
+                body.put("thinking", Map.of("type", "disabled"));
+            log.debug(
+                    "LLM chat request: model={} messages={} tools={}",
+                    model,
+                    messages.size(),
+                    hasTools ? 2 : 0);
+            if (log.isTraceEnabled()) {
+                try {
+                    log.trace("LLM chat request body: {}", json.writeValueAsString(body));
+                } catch (Exception ignored) {
+                }
+            }
             RestClient client = restClientFor(creds);
             JsonNode root;
             try {
-                root = client.post()
-                        .uri("chat/completions")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + creds.apiKey())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .body(body)
-                        .retrieve()
-                        .body(JsonNode.class);
-            } catch (ApiException e) { throw e; }
-            catch (RestClientResponseException e) {
+                root =
+                        client.post()
+                                .uri("chat/completions")
+                                .header(HttpHeaders.AUTHORIZATION, "Bearer " + creds.apiKey())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body(body)
+                                .retrieve()
+                                .body(JsonNode.class);
+            } catch (ApiException e) {
+                throw e;
+            } catch (RestClientResponseException e) {
                 int status = e.getStatusCode().value();
-                String code = status == 429 ? "AGENT_RATE_LIMITED"
-                        : status == 401 || status == 403 || status >= 500 ? "MODEL_PROVIDER_UNAVAILABLE"
-                        : "MODEL_PROVIDER_ERROR";
-                String detail = status == 401 || status == 403
-                        ? "llm 中的 API Key 无效或权限不足（HTTP " + status + "）"
-                        : "Model provider request failed with status " + status;
-                throw new ApiException(status == 429 ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.BAD_GATEWAY, code, detail);
+                String code =
+                        status == 429
+                                ? "AGENT_RATE_LIMITED"
+                                : status == 401 || status == 403 || status >= 500
+                                        ? "MODEL_PROVIDER_UNAVAILABLE"
+                                        : "MODEL_PROVIDER_ERROR";
+                String detail =
+                        status == 401 || status == 403
+                                ? "llm 中的 API Key 无效或权限不足（HTTP " + status + "）"
+                                : "Model provider request failed with status " + status;
+                throw new ApiException(
+                        status == 429 ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.BAD_GATEWAY,
+                        code,
+                        detail);
             } catch (ResourceAccessException e) {
-                throw new ApiException(HttpStatus.GATEWAY_TIMEOUT, "AGENT_TIMEOUT", "Model provider timed out");
+                throw new ApiException(
+                        HttpStatus.GATEWAY_TIMEOUT, "AGENT_TIMEOUT", "Model provider timed out");
             } catch (Exception e) {
-                throw new ApiException(HttpStatus.BAD_GATEWAY, "MODEL_PROVIDER_ERROR",
+                throw new ApiException(
+                        HttpStatus.BAD_GATEWAY,
+                        "MODEL_PROVIDER_ERROR",
                         "Model provider response could not be processed: " + e.getMessage());
             }
             JsonNode usage = root.path("usage");
-            log.debug("LLM chat response: prompt_tokens={} completion_tokens={}", usage.path("prompt_tokens").asLong(0), usage.path("completion_tokens").asLong(0));
-            if (log.isTraceEnabled()) { try { log.trace("LLM chat response body: {}", json.writeValueAsString(root)); } catch (Exception ignored) {} }
+            log.debug(
+                    "LLM chat response: prompt_tokens={} completion_tokens={}",
+                    usage.path("prompt_tokens").asLong(0),
+                    usage.path("completion_tokens").asLong(0));
+            if (log.isTraceEnabled()) {
+                try {
+                    log.trace("LLM chat response body: {}", json.writeValueAsString(root));
+                } catch (Exception ignored) {
+                }
+            }
 
             JsonNode choice = root.path("choices").path(0).path("message");
             JsonNode toolCalls = choice.path("tool_calls");
             if (toolCalls.isArray() && toolCalls.size() > 0 && hasTools) {
-                messages.add(Map.of("role", "assistant", "tool_calls", toolCallMessages(toolCalls), "content", ""));
+                messages.add(
+                        Map.of(
+                                "role",
+                                "assistant",
+                                "tool_calls",
+                                toolCallMessages(toolCalls),
+                                "content",
+                                ""));
                 for (JsonNode call : toolCalls) {
                     String toolName = call.path("function").path("name").asText();
                     String toolId = call.path("id").asText();
-                    String result = executeChatTool(toolName, call.path("function").path("arguments"), actor, projectId, recordId);
+                    String result =
+                            executeChatTool(
+                                    toolName,
+                                    call.path("function").path("arguments"),
+                                    actor,
+                                    projectId,
+                                    recordId);
                     if ("plot_chart".equals(toolName) && result.startsWith("CHART:")) {
-                        try { chartResult = json.readValue(result.substring(6), AgentDtos.ChartView.class); } catch (Exception ignored) {}
+                        try {
+                            chartResult =
+                                    json.readValue(result.substring(6), AgentDtos.ChartView.class);
+                        } catch (Exception ignored) {
+                        }
                         result = "图表已生成。";
                     }
                     if ("fit_data".equals(toolName) && result.startsWith("FIT:")) {
                         try {
                             @SuppressWarnings("unchecked")
-                            List<AgentDtos.FitView> fits = json.readValue(result.substring(4), json.getTypeFactory().constructCollectionType(List.class, AgentDtos.FitView.class));
+                            List<AgentDtos.FitView> fits =
+                                    json.readValue(
+                                            result.substring(4),
+                                            json.getTypeFactory()
+                                                    .constructCollectionType(
+                                                            List.class, AgentDtos.FitView.class));
                             fitsResults = fits;
                             fitResult = fits.isEmpty() ? null : fits.get(0);
                             result = buildFitSummary(fits);
-                        } catch (Exception ignored) {}
+                        } catch (Exception ignored) {
+                        }
                     }
-                    if (result.startsWith("错误:") || result.startsWith("拟合执行失败:") || result.startsWith("未找到可用于")) {
+                    if (result.startsWith("错误:")
+                            || result.startsWith("拟合执行失败:")
+                            || result.startsWith("未找到可用于")) {
                         if (toolError != null) {
-                            return new CompletionResult(result, toolError, chartResult, fitResult, fitsResults);
+                            return new CompletionResult(
+                                    result, toolError, chartResult, fitResult, fitsResults);
                         }
                         toolError = result;
                     }
@@ -481,36 +777,65 @@ public class RecordChatService implements AgentChatUseCase {
 
             String content = contentText(choice.path("content"));
             if (content == null || content.isBlank()) {
-                throw new ApiException(HttpStatus.BAD_GATEWAY, "MODEL_PROVIDER_ERROR", "Model returned empty chat content");
+                throw new ApiException(
+                        HttpStatus.BAD_GATEWAY,
+                        "MODEL_PROVIDER_ERROR",
+                        "Model returned empty chat content");
             }
-            return new CompletionResult(content.trim(), toolError, chartResult, fitResult, fitsResults);
+            return new CompletionResult(
+                    content.trim(), toolError, chartResult, fitResult, fitsResults);
         }
-        throw new ApiException(HttpStatus.BAD_GATEWAY, "MODEL_PROVIDER_ERROR", "Model exceeded tool-call limit");
+        throw new ApiException(
+                HttpStatus.BAD_GATEWAY, "MODEL_PROVIDER_ERROR", "Model exceeded tool-call limit");
     }
 
-    private record CompletionResult(String reply, String systemError, AgentDtos.ChartView chart, AgentDtos.FitView fit, List<AgentDtos.FitView> fits) {
-        CompletionResult(String reply, String systemError) { this(reply, systemError, null, null, null); }
+    private record CompletionResult(
+            String reply,
+            String systemError,
+            AgentDtos.ChartView chart,
+            AgentDtos.FitView fit,
+            List<AgentDtos.FitView> fits) {
+        CompletionResult(String reply, String systemError) {
+            this(reply, systemError, null, null, null);
+        }
     }
 
-    private static final Set<String> CHAT_TOOL_NAMES = Set.of("list_project_attachments", "list_record_attachments", "read_attachment_content", "plot_chart", "fit_data");
+    private static final Set<String> CHAT_TOOL_NAMES =
+            Set.of(
+                    "list_project_attachments",
+                    "list_record_attachments",
+                    "read_attachment_content",
+                    "plot_chart",
+                    "fit_data");
     private static final int TOOL_CONTENT_MAX_CHARS = 4000;
 
     private List<Map<String, Object>> chatToolDefinitions() {
         return toolRegistry.definitions().stream()
-            .filter(d -> CHAT_TOOL_NAMES.contains(d.name()))
-            .map(d -> Map.of("type", "function", "function", Map.of(
-                "name", d.name(),
-                "description", d.description(),
-                "parameters", convertSchema(d.inputSchema())
-            ))).toList();
+                .filter(d -> CHAT_TOOL_NAMES.contains(d.name()))
+                .map(
+                        d ->
+                                Map.of(
+                                        "type",
+                                        "function",
+                                        "function",
+                                        Map.of(
+                                                "name", d.name(),
+                                                "description", d.description(),
+                                                "parameters", convertSchema(d.inputSchema()))))
+                .toList();
     }
 
-    private JsonNode convertSchema(JsonNode schema) { return schema; }
+    private JsonNode convertSchema(JsonNode schema) {
+        return schema;
+    }
 
     private JsonNode safeParseArgs(String text) {
         if (text == null || text.isBlank()) return json.createObjectNode();
-        try { return json.readTree(text); }
-        catch (Exception e) { return json.createObjectNode(); }
+        try {
+            return json.readTree(text);
+        } catch (Exception e) {
+            return json.createObjectNode();
+        }
     }
 
     private List<Map<String, Object>> toolCallMessages(JsonNode toolCalls) {
@@ -518,25 +843,34 @@ public class RecordChatService implements AgentChatUseCase {
         for (JsonNode call : toolCalls) {
             JsonNode argsNode = call.path("function").path("arguments");
             String argsStr = argsNode.isTextual() ? argsNode.asText() : argsNode.toString();
-            result.add(Map.of(
-                "id", call.path("id").asText(),
-                "type", "function",
-                "function", Map.of(
-                    "name", call.path("function").path("name").asText(),
-                    "arguments", argsStr
-                )
-            ));
+            result.add(
+                    Map.of(
+                            "id", call.path("id").asText(),
+                            "type", "function",
+                            "function",
+                                    Map.of(
+                                            "name",
+                                            call.path("function").path("name").asText(),
+                                            "arguments",
+                                            argsStr)));
         }
         return result;
     }
 
-    private String executeChatTool(String name, JsonNode rawArgs, UUID actor, UUID projectId, UUID recordId) {
+    private String executeChatTool(
+            String name, JsonNode rawArgs, UUID actor, UUID projectId, UUID recordId) {
         try {
-            AgentToolContext ctx = new AgentToolContext(
-                UUID.randomUUID(), actor, projectId, recordId != null ? recordId : projectId,
-                recordId != null ? "RECORD" : "PROJECT", recordId != null ? recordId : projectId,
-                null, null, () -> false
-            );
+            AgentToolContext ctx =
+                    new AgentToolContext(
+                            UUID.randomUUID(),
+                            actor,
+                            projectId,
+                            recordId != null ? recordId : projectId,
+                            recordId != null ? "RECORD" : "PROJECT",
+                            recordId != null ? recordId : projectId,
+                            null,
+                            null,
+                            () -> false);
             // OpenAI may return function.arguments as a JSON string; normalize to ObjectNode
             JsonNode args = rawArgs.isTextual() ? safeParseArgs(rawArgs.asText()) : rawArgs;
             if ("list_project_attachments".equals(name)) {
@@ -551,7 +885,10 @@ public class RecordChatService implements AgentChatUseCase {
             if ("read_attachment_content".equals(name)) {
                 log.info("read_attachment_content args: {}", args.toString());
                 JsonNode fileNode = args.path("filename");
-                String rawId = fileNode.isMissingNode() ? args.path("attachmentId").asText() : fileNode.asText();
+                String rawId =
+                        fileNode.isMissingNode()
+                                ? args.path("attachmentId").asText()
+                                : fileNode.asText();
                 UUID attachmentId;
                 try {
                     attachmentId = UUID.fromString(rawId);
@@ -562,24 +899,36 @@ public class RecordChatService implements AgentChatUseCase {
                     }
                     var listPayload = agentReads.listProjectAttachments(ctx);
                     @SuppressWarnings("unchecked")
-                    List<Map<String, Object>> attachments = (List<Map<String, Object>>) listPayload.data().get("data");
+                    List<Map<String, Object>> attachments =
+                            (List<Map<String, Object>>) listPayload.data().get("data");
                     Map<String, Object> matched = null;
                     String search = rawId.trim();
                     for (Map<String, Object> row : attachments) {
                         String fname = String.valueOf(row.get("original_filename"));
-                        if (fname.equals(search) || fname.endsWith(search) || search.endsWith(fname)) {
+                        if (fname.equals(search)
+                                || fname.endsWith(search)
+                                || search.endsWith(fname)) {
                             matched = row;
                             break;
                         }
                     }
                     if (matched == null) {
-                        log.warn("read_attachment_content: no filename match for '{}' among {} attachments", rawId, attachments.size());
+                        log.warn(
+                                "read_attachment_content: no filename match for '{}' among {} attachments",
+                                rawId,
+                                attachments.size());
                         return "未找到文件 '" + rawId + "'，请确认文件名与列表中的一致。";
                     }
                     attachmentId = UUID.fromString(String.valueOf(matched.get("id")));
-                    log.info("read_attachment_content: resolved filename '{}' to attachmentId={}", rawId, attachmentId);
+                    log.info(
+                            "read_attachment_content: resolved filename '{}' to attachmentId={}",
+                            rawId,
+                            attachmentId);
                 }
-                UUID recId = args.has("recordId") && !args.path("recordId").isNull() ? UUID.fromString(args.path("recordId").asText()) : recordId;
+                UUID recId =
+                        args.has("recordId") && !args.path("recordId").isNull()
+                                ? UUID.fromString(args.path("recordId").asText())
+                                : recordId;
                 var payload = agentReads.readAttachmentContent(ctx, attachmentId, recId);
                 Map<String, Object> data = (Map<String, Object>) payload.data().get("data");
                 String content = String.valueOf(data.get("content"));
@@ -600,9 +949,24 @@ public class RecordChatService implements AgentChatUseCase {
                 if (xColumn.isBlank() || yColumn.isBlank()) {
                     return "请提供 xColumn 和 yColumn 参数，例如 xColumn=时间 yColumn=残糖。";
                 }
-                FitModels.FitProposal proposal = new FitModels.FitProposal(true, "y=a+b*x", false, List.of(),
-                        xColumn, yColumn, "CSV_ATTACHMENT", csvHint, List.of(), List.of(), null, null, null, null,
-                        false, false);
+                FitModels.FitProposal proposal =
+                        new FitModels.FitProposal(
+                                true,
+                                "y=a+b*x",
+                                false,
+                                List.of(),
+                                xColumn,
+                                yColumn,
+                                "CSV_ATTACHMENT",
+                                csvHint,
+                                List.of(),
+                                List.of(),
+                                null,
+                                null,
+                                null,
+                                null,
+                                false,
+                                false);
                 List<FitModels.DataPoint> points;
                 try {
                     points = curveFits.extractPlotPoints(actor, projectId, proposal);
@@ -614,11 +978,26 @@ public class RecordChatService implements AgentChatUseCase {
                 for (FitModels.DataPoint p : points) {
                     chartPoints.add(new AgentDtos.ChartPointView(p.x(), p.y(), p.recordCode()));
                 }
-                String title = ("bar".equals(chartType) ? "柱状图" : "scatter".equals(chartType) ? "散点图" : "折线图")
-                        + "：" + yColumn + " vs " + xColumn;
-                AgentDtos.ChartView chart = new AgentDtos.ChartView(chartType, title, xColumn, yColumn,
-                        List.of(new AgentDtos.ChartSeriesView(yColumn, chartPoints)));
-                try { return "CHART:" + json.writeValueAsString(chart); } catch (Exception e) { return "图表生成失败: " + e.getMessage(); }
+                String title =
+                        ("bar".equals(chartType)
+                                        ? "柱状图"
+                                        : "scatter".equals(chartType) ? "散点图" : "折线图")
+                                + "："
+                                + yColumn
+                                + " vs "
+                                + xColumn;
+                AgentDtos.ChartView chart =
+                        new AgentDtos.ChartView(
+                                chartType,
+                                title,
+                                xColumn,
+                                yColumn,
+                                List.of(new AgentDtos.ChartSeriesView(yColumn, chartPoints)));
+                try {
+                    return "CHART:" + json.writeValueAsString(chart);
+                } catch (Exception e) {
+                    return "图表生成失败: " + e.getMessage();
+                }
             }
             if ("fit_data".equals(name)) {
                 String equation = args.path("equation").asText("y=a+b*x");
@@ -628,10 +1007,26 @@ public class RecordChatService implements AgentChatUseCase {
                 if (xColumn.isBlank() || yColumn.isBlank()) {
                     return "STOP. 请提供 xColumn 和 yColumn 参数。不要重试。";
                 }
-                FitModels.FitProposal proposal = new FitModels.FitProposal(true, equation, autoCompare, List.of(),
-                        xColumn, yColumn, "CSV_ATTACHMENT", null, List.of(), List.of(), null, null, null, null,
-                        false, false);
-                List<FitModels.DataPoint> points = curveFits.extractPlotPoints(actor, projectId, proposal);
+                FitModels.FitProposal proposal =
+                        new FitModels.FitProposal(
+                                true,
+                                equation,
+                                autoCompare,
+                                List.of(),
+                                xColumn,
+                                yColumn,
+                                "CSV_ATTACHMENT",
+                                null,
+                                List.of(),
+                                List.of(),
+                                null,
+                                null,
+                                null,
+                                null,
+                                false,
+                                false);
+                List<FitModels.DataPoint> points =
+                        curveFits.extractPlotPoints(actor, projectId, proposal);
                 if (points.isEmpty()) {
                     return "未找到可用于拟合的数据点。请确认列名正确。";
                 }
@@ -641,7 +1036,11 @@ public class RecordChatService implements AgentChatUseCase {
                         results = curveFits.fitProposalAll(actor, projectId, proposal);
                     } else {
                         CurveFitEngine engine = new CurveFitEngine();
-                        FitModels.FitResult result = engine.fit(ExpressionParser.parseEquation(equation), points, List.of());
+                        FitModels.FitResult result =
+                                engine.fit(
+                                        ExpressionParser.parseEquation(equation),
+                                        points,
+                                        List.of());
                         results = List.of(result);
                     }
                     List<AgentDtos.FitView> views = results.stream().map(this::toFitView).toList();
@@ -660,10 +1059,17 @@ public class RecordChatService implements AgentChatUseCase {
     }
 
     private RestClient restClientFor(AgentCredentials creds) {
-        String base = blank(creds.baseUrl()) ? "http://127.0.0.1/" : creds.baseUrl().replaceAll("/*$", "/");
-        var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
-                .connectTimeout(Duration.ofMillis(Math.max(1000, properties.getTimeoutMs())))
-                .build());
+        String base =
+                blank(creds.baseUrl())
+                        ? "http://127.0.0.1/"
+                        : creds.baseUrl().replaceAll("/*$", "/");
+        var factory =
+                new JdkClientHttpRequestFactory(
+                        HttpClient.newBuilder()
+                                .connectTimeout(
+                                        Duration.ofMillis(
+                                                Math.max(1000, properties.getTimeoutMs())))
+                                .build());
         factory.setReadTimeout(Duration.ofMillis(Math.max(1000, properties.getTimeoutMs())));
         return RestClient.builder().baseUrl(base).requestFactory(factory).build();
     }
@@ -676,18 +1082,33 @@ public class RecordChatService implements AgentChatUseCase {
         text.append("experimentDate=").append(record.get("experiment_date")).append('\n');
         text.append("status=").append(record.get("status")).append('\n');
         text.append("currentRevisionNo=").append(record.get("current_revision_no")).append('\n');
-        text.append("purpose=").append(limit(String.valueOf(record.get("purpose")), 1000)).append('\n');
-        text.append("fieldValues=").append(limit(String.valueOf(record.get("field_values_json")), 2000)).append('\n');
-        text.append("contentPlainText=").append(limit(String.valueOf(record.get("content_plain_text")), 2000)).append('\n');
-        List<Map<String,Object>> attachments=contextStore.activeAttachments(UUID.fromString(record.get("id").toString()));
+        text.append("purpose=")
+                .append(limit(String.valueOf(record.get("purpose")), 1000))
+                .append('\n');
+        text.append("fieldValues=")
+                .append(limit(String.valueOf(record.get("field_values_json")), 2000))
+                .append('\n');
+        text.append("contentPlainText=")
+                .append(limit(String.valueOf(record.get("content_plain_text")), 2000))
+                .append('\n');
+        List<Map<String, Object>> attachments =
+                contextStore.activeAttachments(UUID.fromString(record.get("id").toString()));
         if (!attachments.isEmpty()) {
             text.append("attachments:\n");
             for (Map<String, Object> att : attachments) {
-                text.append("- id=").append(att.get("id")).append(" ").append(att.get("original_filename"))
-                        .append(" (").append(att.get("media_type")).append(", ").append(att.get("size_bytes")).append(" B)\n");
+                text.append("- id=")
+                        .append(att.get("id"))
+                        .append(" ")
+                        .append(att.get("original_filename"))
+                        .append(" (")
+                        .append(att.get("media_type"))
+                        .append(", ")
+                        .append(att.get("size_bytes"))
+                        .append(" B)\n");
             }
         }
-        List<Map<String,Object>> artifacts=contextStore.latestRecordArtifact(UUID.fromString(record.get("id").toString()));
+        List<Map<String, Object>> artifacts =
+                contextStore.latestRecordArtifact(UUID.fromString(record.get("id").toString()));
         appendLatestArtifact(text, artifacts);
         return text.toString();
     }
@@ -698,34 +1119,58 @@ public class RecordChatService implements AgentChatUseCase {
         text.append("projectId=").append(projectId).append('\n');
         text.append("name=").append(project.get("name")).append('\n');
         text.append("status=").append(project.get("status")).append('\n');
-        text.append("description=").append(limit(String.valueOf(project.get("description")), 500)).append('\n');
-        text.append("detailedDescription=").append(limit(String.valueOf(project.get("detailed_description")), 1000)).append('\n');
-        UUID projectUuid=UUID.fromString(projectId);long members=contextStore.memberCount(projectUuid);
+        text.append("description=")
+                .append(limit(String.valueOf(project.get("description")), 500))
+                .append('\n');
+        text.append("detailedDescription=")
+                .append(limit(String.valueOf(project.get("detailed_description")), 1000))
+                .append('\n');
+        UUID projectUuid = UUID.fromString(projectId);
+        long members = contextStore.memberCount(projectUuid);
         text.append("memberCount=").append(members).append('\n');
-        List<Map<String,Object>> roles=contextStore.memberRoleCounts(projectUuid);
+        List<Map<String, Object>> roles = contextStore.memberRoleCounts(projectUuid);
         text.append("membersByRole=");
-        for (Map<String, Object> row : roles) text.append(row.get("role")).append('=').append(row.get("cnt")).append(';');
+        for (Map<String, Object> row : roles)
+            text.append(row.get("role")).append('=').append(row.get("cnt")).append(';');
         text.append('\n');
-        List<Map<String,Object>> statuses=contextStore.recordStatusCounts(projectUuid);
+        List<Map<String, Object>> statuses = contextStore.recordStatusCounts(projectUuid);
         text.append("recordsByStatus=");
-        for (Map<String, Object> row : statuses) text.append(row.get("status")).append('=').append(row.get("cnt")).append(';');
+        for (Map<String, Object> row : statuses)
+            text.append(row.get("status")).append('=').append(row.get("cnt")).append(';');
         text.append('\n');
-        List<Map<String,Object>> records=contextStore.recentRecords(projectUuid);
+        List<Map<String, Object>> records = contextStore.recentRecords(projectUuid);
         text.append("recentRecords:\n");
         for (Map<String, Object> row : records) {
-            text.append("- ").append(row.get("code")).append(" | ").append(limit(String.valueOf(row.get("title")), 120))
-                    .append(" | ").append(row.get("status")).append(" | R").append(row.get("current_revision_no")).append('\n');
+            text.append("- ")
+                    .append(row.get("code"))
+                    .append(" | ")
+                    .append(limit(String.valueOf(row.get("title")), 120))
+                    .append(" | ")
+                    .append(row.get("status"))
+                    .append(" | R")
+                    .append(row.get("current_revision_no"))
+                    .append('\n');
         }
-        List<Map<String,Object>> attachments=contextStore.projectAttachments(projectUuid);
+        List<Map<String, Object>> attachments = contextStore.projectAttachments(projectUuid);
         if (!attachments.isEmpty()) {
             text.append("projectAttachments:\n");
             for (Map<String, Object> att : attachments) {
-                text.append("- id=").append(att.get("id")).append(" ").append(att.get("original_filename"))
-                        .append(" (").append(att.get("media_type")).append(", ").append(att.get("size_bytes"))
-                        .append(" B) [").append(att.get("record_code")).append(" ").append(att.get("record_title")).append("]\n");
+                text.append("- id=")
+                        .append(att.get("id"))
+                        .append(" ")
+                        .append(att.get("original_filename"))
+                        .append(" (")
+                        .append(att.get("media_type"))
+                        .append(", ")
+                        .append(att.get("size_bytes"))
+                        .append(" B) [")
+                        .append(att.get("record_code"))
+                        .append(" ")
+                        .append(att.get("record_title"))
+                        .append("]\n");
             }
         }
-        List<Map<String,Object>> artifacts=contextStore.latestProjectArtifact(projectUuid);
+        List<Map<String, Object>> artifacts = contextStore.latestProjectArtifact(projectUuid);
         appendLatestArtifact(text, artifacts);
         return text.toString();
     }
@@ -734,8 +1179,12 @@ public class RecordChatService implements AgentChatUseCase {
         if (artifacts.isEmpty()) return;
         try {
             JsonNode content = json.readTree(String.valueOf(artifacts.get(0).get("content_json")));
-            text.append("latestSummaryHeadline=").append(limit(content.path("headline").asText(""), 300)).append('\n');
-            text.append("latestExecutiveSummary=").append(limit(content.path("executiveSummary").asText(""), 800)).append('\n');
+            text.append("latestSummaryHeadline=")
+                    .append(limit(content.path("headline").asText(""), 300))
+                    .append('\n');
+            text.append("latestExecutiveSummary=")
+                    .append(limit(content.path("executiveSummary").asText(""), 800))
+                    .append('\n');
         } catch (Exception ignored) {
             // context enrichment is best-effort
         }
@@ -749,7 +1198,8 @@ public class RecordChatService implements AgentChatUseCase {
             if (item == null) continue;
             String role = item.role() == null ? "" : item.role().trim();
             String content = item.content() == null ? "" : item.content().trim();
-            if (!"user".equals(role) && !"assistant".equals(role)) throw invalid("history role must be user or assistant");
+            if (!"user".equals(role) && !"assistant".equals(role))
+                throw invalid("history role must be user or assistant");
             if (content.isEmpty()) continue;
             if (content.length() > 4000) throw invalid("history content exceeds 4000 characters");
             values.add(new AgentDtos.ChatMessage(role, content, null));
@@ -763,10 +1213,14 @@ public class RecordChatService implements AgentChatUseCase {
         StringBuilder sb = new StringBuilder("拟合已完成。请引用以下真实数据回复用户，不要编造信息：\n");
         for (int i = 0; i < fits.size(); i++) {
             AgentDtos.FitView f = fits.get(i);
-            sb.append("- ").append(f.equation()).append(": R²=")
+            sb.append("- ")
+                    .append(f.equation())
+                    .append(": R²=")
                     .append(String.format("%.4f", f.rSquared()))
-                    .append(", RMSE=").append(String.format("%.4f", f.rmse()))
-                    .append(", n=").append(f.n());
+                    .append(", RMSE=")
+                    .append(String.format("%.4f", f.rmse()))
+                    .append(", n=")
+                    .append(f.n());
             if (f.usedRecordCodes() != null && !f.usedRecordCodes().isEmpty()) {
                 sb.append(", 记录=").append(String.join(",", f.usedRecordCodes()));
             }
@@ -779,19 +1233,35 @@ public class RecordChatService implements AgentChatUseCase {
     }
 
     private Map<String, Object> requireVisibleRecord(UUID actor, UUID recordId) {
-        return contextStore.findVisibleRecord(actor,recordId).orElseThrow(() ->
-                new ApiException(HttpStatus.NOT_FOUND,"RESOURCE_NOT_FOUND","Resource not found or inaccessible"));
+        return contextStore
+                .findVisibleRecord(actor, recordId)
+                .orElseThrow(
+                        () ->
+                                new ApiException(
+                                        HttpStatus.NOT_FOUND,
+                                        "RESOURCE_NOT_FOUND",
+                                        "Resource not found or inaccessible"));
     }
 
     private Map<String, Object> requireVisibleProject(UUID actor, UUID projectId) {
-        return contextStore.findVisibleProject(actor,projectId).orElseThrow(() ->
-                new ApiException(HttpStatus.NOT_FOUND,"RESOURCE_NOT_FOUND","Resource not found or inaccessible"));
+        return contextStore
+                .findVisibleProject(actor, projectId)
+                .orElseThrow(
+                        () ->
+                                new ApiException(
+                                        HttpStatus.NOT_FOUND,
+                                        "RESOURCE_NOT_FOUND",
+                                        "Resource not found or inaccessible"));
     }
 
     private void requireEnabled() {
         if (!properties.isEnabled()) {
-            log.warn("Agent chat request rejected: agent.enabled=false (set AGENT_ENABLED=true to enable)");
-            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "AGENT_DISABLED", "Agent functionality is disabled");
+            log.warn(
+                    "Agent chat request rejected: agent.enabled=false (set AGENT_ENABLED=true to enable)");
+            throw new ApiException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "AGENT_DISABLED",
+                    "Agent functionality is disabled");
         }
     }
 
@@ -822,12 +1292,37 @@ public class RecordChatService implements AgentChatUseCase {
         return value.length() <= max ? value : value.substring(0, max);
     }
 
-    @Override public List<AgentDtos.ChatSessionSummary> listProjectSessions(UUID actor, UUID projectId) { return sessions.listByProject(actor, projectId); }
-    @Override public List<AgentDtos.ChatSessionSummary> listRecordSessions(UUID actor, UUID recordId) { return sessions.listByRecord(actor, recordId); }
-    @Override public AgentDtos.ChatSessionDetail getSession(UUID actor, UUID sessionId) { return sessions.get(actor, sessionId); }
-    @Override public AgentDtos.ChatSessionDetail saveSession(UUID actor, UUID projectId, UUID recordId, AgentDtos.SaveSessionRequest request) { return sessions.save(actor, projectId, recordId, request); }
-    @Override public AgentDtos.ChatSessionDetail appendSessionMessages(UUID actor, UUID sessionId, List<AgentDtos.ChatMessage> messages) { return sessions.appendMessages(actor, sessionId, messages); }
-    @Override public void deleteSession(UUID actor, UUID sessionId) { sessions.delete(actor, sessionId); }
+    @Override
+    public List<AgentDtos.ChatSessionSummary> listProjectSessions(UUID actor, UUID projectId) {
+        return sessions.listByProject(actor, projectId);
+    }
+
+    @Override
+    public List<AgentDtos.ChatSessionSummary> listRecordSessions(UUID actor, UUID recordId) {
+        return sessions.listByRecord(actor, recordId);
+    }
+
+    @Override
+    public AgentDtos.ChatSessionDetail getSession(UUID actor, UUID sessionId) {
+        return sessions.get(actor, sessionId);
+    }
+
+    @Override
+    public AgentDtos.ChatSessionDetail saveSession(
+            UUID actor, UUID projectId, UUID recordId, AgentDtos.SaveSessionRequest request) {
+        return sessions.save(actor, projectId, recordId, request);
+    }
+
+    @Override
+    public AgentDtos.ChatSessionDetail appendSessionMessages(
+            UUID actor, UUID sessionId, List<AgentDtos.ChatMessage> messages) {
+        return sessions.appendMessages(actor, sessionId, messages);
+    }
+
+    @Override
+    public void deleteSession(UUID actor, UUID sessionId) {
+        sessions.delete(actor, sessionId);
+    }
 
     private record ParsedChat(String message, List<AgentDtos.ChatMessage> history) {}
 }

@@ -2,7 +2,10 @@ import path from 'node:path'
 import { expect, test } from '@playwright/test'
 import { registerAccount, loginUi, unique } from './helpers'
 
-test('three-account R1 return, R2 approval, search, export and archive flow', async ({ browser, request }) => {
+test('three-account R1 return, R2 approval, search, export and archive flow', async ({
+  browser,
+  request,
+}) => {
   const owner = await registerAccount(request, '演示负责人 A')
   const member = await registerAccount(request, '演示成员 B')
   const reviewer = await registerAccount(request, '演示审核者 C')
@@ -20,9 +23,15 @@ test('three-account R1 return, R2 approval, search, export and archive flow', as
   await pageA.getByRole('button', { name: '新建项目' }).click()
   await pageA.getByLabel('项目名称').fill(projectName)
   await pageA.getByLabel('项目简介').fill('Playwright 三账号完整演示')
-  await pageA.getByLabel('项目详细描述').fill('验证项目协作、记录审核、附件、搜索、导出和不可逆归档的完整流程。')
+  await pageA
+    .getByLabel('项目详细描述')
+    .fill('验证项目协作、记录审核、附件、搜索、导出和不可逆归档的完整流程。')
   await pageA.getByRole('button', { name: '创建项目' }).click()
-  await pageA.getByText(projectName, { exact: true }).locator('xpath=ancestor::article').getByRole('button', { name: '进入项目' }).click()
+  await pageA
+    .getByText(projectName, { exact: true })
+    .locator('xpath=ancestor::article')
+    .getByRole('button', { name: '进入项目' })
+    .click()
   const projectId = pageA.url().match(/projects\/([^?]+)/)[1]
   await pageA.getByRole('button', { name: /^成员/ }).click()
   for (const account of [member, reviewer]) {
@@ -65,8 +74,12 @@ test('three-account R1 return, R2 approval, search, export and archive flow', as
   await pageB.getByText(templateName, { exact: true }).locator('xpath=ancestor::button[1]').click()
   await pageB.getByRole('button', { name: '进入编辑器' }).click()
   await expect(pageB).toHaveURL(/\/records\/[^/]+\/edit\?new=1$/)
-  await pageB.getByLabel('选择附件').setInputFiles(path.resolve(process.cwd(), '../output/pdf/bionote-mvp-sample.pdf'))
-  await expect(pageB.getByRole('paragraph').filter({ hasText: 'bionote-mvp-sample.pdf' })).toBeVisible()
+  await pageB
+    .getByLabel('选择附件')
+    .setInputFiles(path.resolve(process.cwd(), '../output/pdf/bionote-mvp-sample.pdf'))
+  await expect(
+    pageB.getByRole('paragraph').filter({ hasText: 'bionote-mvp-sample.pdf' }),
+  ).toBeVisible()
   await pageB.getByRole('button', { name: '预览' }).click()
   await expect(pageB.getByTitle('PDF 附件预览')).toBeVisible()
   await expect(pageB.getByTitle('PDF 附件预览')).not.toHaveAttribute('sandbox')
@@ -75,11 +88,18 @@ test('three-account R1 return, R2 approval, search, export and archive flow', as
   await pageB.getByLabel('实验类型').fill('PCR')
   await pageB.getByLabel('实验目的').fill('验证三账号审核闭环')
   await pageB.getByText('预期条带大小', { exact: true }).locator('..').locator('input').fill('850')
-  await pageB.getByText('实验结果', { exact: true }).locator('..').locator('textarea').fill('初次结果，等待审核。')
+  await pageB
+    .getByText('实验结果', { exact: true })
+    .locator('..')
+    .locator('textarea')
+    .fill('初次结果，等待审核。')
   await pageB.getByLabel('结果文件').selectOption({ label: 'bionote-mvp-sample.pdf' })
   await pageB.locator('.ProseMirror').fill('PCR 扩增过程与初次实验结果。')
   await pageB.getByRole('button', { name: '保存', exact: true }).click()
-  await expect(pageB).toHaveURL((url) => /\/records\/[^/]+\/edit$/.test(url.pathname) && !url.pathname.includes('/records/new/'))
+  await expect(pageB).toHaveURL(
+    (url) =>
+      /\/records\/[^/]+\/edit$/.test(url.pathname) && !url.pathname.includes('/records/new/'),
+  )
   const recordId = pageB.url().match(/records\/([^/]+)\/edit/)[1]
   await pageB.goto(`/records/${recordId}`)
   await expect(pageB.getByRole('button', { name: '返回上一级' })).toBeVisible()
@@ -118,7 +138,12 @@ test('three-account R1 return, R2 approval, search, export and archive flow', as
   expect((await pdfDownload).suggestedFilename()).toMatch(/\.pdf$/)
 
   await pageA.goto(`/projects/${projectId}?tab=timeline`)
-  await expect(pageA.locator('ol').getByText(/通过了实验记录审核/).first()).toBeVisible()
+  await expect(
+    pageA
+      .locator('ol')
+      .getByText(/通过了实验记录审核/)
+      .first(),
+  ).toBeVisible()
   pageA.once('dialog', (dialog) => dialog.accept())
   await pageA.getByRole('button', { name: '归档项目' }).click()
   await expect(pageA.getByText(/不可逆归档/)).toBeVisible()

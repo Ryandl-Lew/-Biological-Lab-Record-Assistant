@@ -9,12 +9,11 @@ export function renderMarkdown(text) {
   // code blocks (```...```) — must process before inline
   const codeBlocks = []
   html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_m, lang, code) => {
-    const escaped = code
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
+    const escaped = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     const placeholder = `%%CODEBLOCK_${codeBlocks.length}%%`
-    codeBlocks.push(`<pre class="my-2 overflow-x-auto rounded-lg bg-slate-100 p-3 text-xs"><code>${escaped}</code></pre>`)
+    codeBlocks.push(
+      `<pre class="my-2 overflow-x-auto rounded-lg bg-slate-100 p-3 text-xs"><code>${escaped}</code></pre>`,
+    )
     return placeholder
   })
 
@@ -40,7 +39,10 @@ export function renderMarkdown(text) {
   html = html.replace(/%%CODEBLOCK_(\d+)%%/g, (_m, idx) => codeBlocks[parseInt(idx)] || '')
 
   // inline code (`...`)
-  html = html.replace(/`([^`]+)`/g, '<code class="rounded bg-slate-100 px-1 py-0.5 text-xs font-mono text-rose-600">$1</code>')
+  html = html.replace(
+    /`([^`]+)`/g,
+    '<code class="rounded bg-slate-100 px-1 py-0.5 text-xs font-mono text-rose-600">$1</code>',
+  )
 
   // headers
   html = html.replace(/^### (.+)$/gm, '<h4 class="mt-3 mb-1 text-sm font-semibold">$1</h4>')
@@ -53,7 +55,10 @@ export function renderMarkdown(text) {
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
 
   // links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-brand-600 underline" target="_blank" rel="noopener noreferrer">$1</a>')
+  html = html.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    '<a href="$2" class="text-brand-600 underline" target="_blank" rel="noopener noreferrer">$1</a>',
+  )
 
   // unordered lists — group consecutive lines, wrap in <ul>, each line in <li>
   // Handles optional leading whitespace (indented lists)
@@ -77,22 +82,42 @@ export function renderMarkdown(text) {
   })
 
   // tables (| header | header | ... | separator | data rows)
-  html = html.replace(/((?:^\s*\|[^\n]+\|\s*\n\s*\|[\s\-:|]+\|\s*\n(?:\s*\|[^\n]+\|\s*\n?)*)+)/gm, (block) => {
-    const lines = block.trim().split('\n')
-    if (lines.length < 3) return block
-    let result = '<table class="my-2 w-full border-collapse overflow-x-auto text-xs"><thead>'
-    // header row
-    const headers = lines[0].split('|').map((cell) => cell.trim()).filter(Boolean)
-    result += '<tr>' + headers.map((h) => `<th class="border border-slate-300 bg-slate-100 px-2 py-1 text-left font-medium">${h}</th>`).join('') + '</tr>'
-    result += '</thead><tbody>'
-    // data rows (skip separator line)
-    for (let i = 2; i < lines.length; i++) {
-      const cells = lines[i].split('|').map((cell) => cell.trim()).filter(Boolean)
-      result += '<tr>' + cells.map((c) => `<td class="border border-slate-300 px-2 py-1">${c}</td>`).join('') + '</tr>'
-    }
-    result += '</tbody></table>'
-    return result
-  })
+  html = html.replace(
+    /((?:^\s*\|[^\n]+\|\s*\n\s*\|[\s\-:|]+\|\s*\n(?:\s*\|[^\n]+\|\s*\n?)*)+)/gm,
+    (block) => {
+      const lines = block.trim().split('\n')
+      if (lines.length < 3) return block
+      let result = '<table class="my-2 w-full border-collapse overflow-x-auto text-xs"><thead>'
+      // header row
+      const headers = lines[0]
+        .split('|')
+        .map((cell) => cell.trim())
+        .filter(Boolean)
+      result +=
+        '<tr>' +
+        headers
+          .map(
+            (h) =>
+              `<th class="border border-slate-300 bg-slate-100 px-2 py-1 text-left font-medium">${h}</th>`,
+          )
+          .join('') +
+        '</tr>'
+      result += '</thead><tbody>'
+      // data rows (skip separator line)
+      for (let i = 2; i < lines.length; i++) {
+        const cells = lines[i]
+          .split('|')
+          .map((cell) => cell.trim())
+          .filter(Boolean)
+        result +=
+          '<tr>' +
+          cells.map((c) => `<td class="border border-slate-300 px-2 py-1">${c}</td>`).join('') +
+          '</tr>'
+      }
+      result += '</tbody></table>'
+      return result
+    },
+  )
 
   // paragraphs — split by double newline, wrap in <p>
   const blocks = html.split('\n\n')
@@ -107,7 +132,54 @@ export function renderMarkdown(text) {
     .join('\n')
 
   return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'pre', 'code', 'a', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'span', 'mrow', 'mfrac', 'msup', 'msub', 'mover', 'munder', 'mo', 'mi', 'mn', 'mtext', 'msqrt', 'mtable', 'mtr', 'mtd', 'annotation'],
-    ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style', 'aria-hidden', 'columnalign', 'columnspacing', 'rowspacing'],
+    ALLOWED_TAGS: [
+      'p',
+      'br',
+      'strong',
+      'em',
+      'h2',
+      'h3',
+      'h4',
+      'ul',
+      'ol',
+      'li',
+      'pre',
+      'code',
+      'a',
+      'blockquote',
+      'table',
+      'thead',
+      'tbody',
+      'tr',
+      'th',
+      'td',
+      'span',
+      'mrow',
+      'mfrac',
+      'msup',
+      'msub',
+      'mover',
+      'munder',
+      'mo',
+      'mi',
+      'mn',
+      'mtext',
+      'msqrt',
+      'mtable',
+      'mtr',
+      'mtd',
+      'annotation',
+    ],
+    ALLOWED_ATTR: [
+      'href',
+      'target',
+      'rel',
+      'class',
+      'style',
+      'aria-hidden',
+      'columnalign',
+      'columnspacing',
+      'rowspacing',
+    ],
   })
 }

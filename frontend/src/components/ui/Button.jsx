@@ -21,14 +21,11 @@ const VARIANTS = {
     'bg-brand-600 text-white shadow-sm hover:bg-brand-700 active:bg-brand-800 disabled:opacity-60',
   secondary:
     'border border-slate-300 bg-white text-slate-700 shadow-sm hover:border-slate-400 hover:bg-slate-50 disabled:opacity-60',
-  ghost:
-    'text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-60',
+  ghost: 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-60',
   danger:
     'border border-red-200 bg-white text-red-600 shadow-sm hover:bg-red-50 hover:border-red-300 disabled:opacity-60',
-  white:
-    'bg-white text-brand-700 shadow-sm hover:bg-brand-50 disabled:opacity-60',
-  outlineWhite:
-    'border border-white/50 text-white hover:bg-white/10 disabled:opacity-60',
+  white: 'bg-white text-brand-700 shadow-sm hover:bg-brand-50 disabled:opacity-60',
+  outlineWhite: 'border border-white/50 text-white hover:bg-white/10 disabled:opacity-60',
 }
 
 const SIZES = {
@@ -38,18 +35,21 @@ const SIZES = {
 
 const ICON_SIZES = { sm: 14, md: 16 }
 
-const Button = forwardRef(function Button({
-  variant = 'primary',
-  size = 'md',
-  icon: Icon,
-  loading = false,
-  to,
-  type = 'button',
-  disabled,
-  className = '',
-  children,
-  ...rest
-}, ref) {
+const Button = forwardRef(function Button(
+  {
+    variant = 'primary',
+    size = 'md',
+    icon: Icon,
+    loading = false,
+    to,
+    type = 'button',
+    disabled,
+    className = '',
+    children,
+    ...rest
+  },
+  ref,
+) {
   const cls = [
     'inline-flex select-none items-center justify-center whitespace-nowrap font-medium transition-colors',
     VARIANTS[variant] ?? VARIANTS.primary,

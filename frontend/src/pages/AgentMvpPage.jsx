@@ -6,7 +6,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Bot, ExternalLink, History, MessageSquarePlus, Trash2 } from 'lucide-react'
 import { fetchProject, fetchProjects } from '@/api'
-import { deleteSession, getSession, listProjectSessions, saveProjectSession, appendSessionMessages } from '@/api/agentChat'
+import {
+  deleteSession,
+  getSession,
+  listProjectSessions,
+  saveProjectSession,
+  appendSessionMessages,
+} from '@/api/agentChat'
 import ProjectChatPanel from '@/components/agent/ProjectChatPanel'
 import { Button, EmptyState, PageHeader, Surface } from '@/components/ui'
 
@@ -50,7 +56,9 @@ export default function AgentMvpPage() {
       .finally(() => {
         if (!cancelled) setLoadingList(false)
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -76,7 +84,9 @@ export default function AgentMvpPage() {
       .finally(() => {
         if (!cancelled) setLoadingProject(false)
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [selectedId])
 
   useEffect(() => {
@@ -172,10 +182,20 @@ export default function AgentMvpPage() {
               ))}
             </select>
           </label>
-          {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+          {error && (
+            <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+              {error}
+            </p>
+          )}
         </Surface>
-        {loadingList ? <p className="text-sm text-slate-400">加载中…</p> : (
-          <EmptyState icon={Bot} title="请先选择实验项目" description="Agent 对话与拟合都绑定到具体项目。可在上方下拉框中选择，或先到项目管理中加入项目。" />
+        {loadingList ? (
+          <p className="text-sm text-slate-400">加载中…</p>
+        ) : (
+          <EmptyState
+            icon={Bot}
+            title="请先选择实验项目"
+            description="Agent 对话与拟合都绑定到具体项目。可在上方下拉框中选择，或先到项目管理中加入项目。"
+          />
         )}
       </section>
     )
@@ -205,39 +225,71 @@ export default function AgentMvpPage() {
               ))}
             </select>
             {selectedId && (
-              <Link to={`/projects/${selectedId}`} className="inline-flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700">
-                打开项目<ExternalLink size={14} />
+              <Link
+                to={`/projects/${selectedId}`}
+                className="inline-flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700"
+              >
+                打开项目
+                <ExternalLink size={14} />
               </Link>
             )}
           </label>
           <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" icon={MessageSquarePlus} onClick={handleNewChat}>新对话</Button>
-            <Button variant="secondary" size="sm" icon={History} onClick={() => { listProjectSessions(selectedId).then(setSessions).catch(() => {}); setShowHistory(!showHistory) }}>对话历史</Button>
+            <Button variant="secondary" size="sm" icon={MessageSquarePlus} onClick={handleNewChat}>
+              新对话
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={History}
+              onClick={() => {
+                listProjectSessions(selectedId)
+                  .then(setSessions)
+                  .catch(() => {})
+                setShowHistory(!showHistory)
+              }}
+            >
+              对话历史
+            </Button>
           </div>
         </div>
-        {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+        {error && (
+          <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            {error}
+          </p>
+        )}
       </Surface>
 
       {showHistory && (
-        <Surface title="对话历史" extra={
-          <button onClick={() => setShowHistory(false)} className="text-sm text-slate-400 hover:text-slate-600">关闭</button>
-        }>
+        <Surface
+          title="对话历史"
+          extra={
+            <button
+              onClick={() => setShowHistory(false)}
+              className="text-sm text-slate-400 hover:text-slate-600"
+            >
+              关闭
+            </button>
+          }
+        >
           {sessions.length === 0 ? (
             <p className="py-6 text-center text-sm text-slate-400">暂无保存的对话</p>
           ) : (
             <div className="divide-y">
               {sessions.map((s) => (
                 <div key={s.id} className="flex items-center justify-between py-3">
-                  <button
-                    onClick={() => handleLoadSession(s.id)}
-                    className="flex-1 text-left"
-                  >
+                  <button onClick={() => handleLoadSession(s.id)} className="flex-1 text-left">
                     <p className="truncate text-sm font-medium text-slate-900">{s.title}</p>
                     <p className="mt-0.5 text-xs text-slate-400">
                       {s.messageCount} 条消息 · {new Date(s.updatedAt).toLocaleString()}
                     </p>
                   </button>
-                  <Button variant="danger" size="sm" icon={Trash2} onClick={() => handleDelete(s.id)} />
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    icon={Trash2}
+                    onClick={() => handleDelete(s.id)}
+                  />
                 </div>
               ))}
             </div>

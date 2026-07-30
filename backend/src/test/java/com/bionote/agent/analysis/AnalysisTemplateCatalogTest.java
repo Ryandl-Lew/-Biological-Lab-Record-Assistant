@@ -1,11 +1,11 @@
 package com.bionote.agent.analysis;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
 
 class AnalysisTemplateCatalogTest {
     @Test
@@ -61,8 +61,11 @@ class AnalysisTemplateCatalogTest {
         for (var template : AnalysisTemplateCatalog.all()) {
             assertNotNull(template.id(), "id required for " + template.label());
             assertNotNull(template.label(), "label required for " + template.id());
-            assertFalse(template.outputSections().isEmpty(), "outputSections required for " + template.id());
-            assertNotNull(template.systemAddendum(), "systemAddendum required for " + template.id());
+            assertFalse(
+                    template.outputSections().isEmpty(),
+                    "outputSections required for " + template.id());
+            assertNotNull(
+                    template.systemAddendum(), "systemAddendum required for " + template.id());
         }
     }
 

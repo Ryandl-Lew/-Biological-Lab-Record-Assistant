@@ -9,6 +9,9 @@ function query(params = {}) {
   return value ? `?${value}` : ''
 }
 
-export const fetchRevisionSummaries = (recordId, params = {}) => request(`/records/${recordId}/revisions${query(params)}`)
-export const fetchRevisionDetail = (recordId, revisionId) => request(`/records/${recordId}/revisions/${revisionId}`)
-export const fetchRevisionDiff = (recordId, params) => request(`/records/${recordId}/revision-diff${query(params)}`)
+export const fetchRevisionSummaries = (recordId, params = {}) =>
+  request(`/records/${recordId}/revisions${query(params)}`)
+export const fetchRevisionDetail = (recordId, revisionId) =>
+  request(`/records/${recordId}/revisions/${revisionId}`)
+export const fetchRevisionDiff = (recordId, params) =>
+  request(`/records/${recordId}/revision-diff${query(params)}`)

@@ -7,7 +7,9 @@ import RecordDetailMvpPage from './RecordDetailMvpPage'
 
 vi.mock('@/api', () => ({
   fetchRecord: vi.fn(),
-  fetchRevisionSummaries: vi.fn().mockResolvedValue({ items: [], meta: { page: 0, size: 20, totalElements: 0, totalPages: 0 } }),
+  fetchRevisionSummaries: vi
+    .fn()
+    .mockResolvedValue({ items: [], meta: { page: 0, size: 20, totalElements: 0, totalPages: 0 } }),
   fetchAttachments: vi.fn().mockResolvedValue([]),
   fetchReviewerCandidates: vi.fn(),
   submitRecord: vi.fn(),
@@ -40,14 +42,15 @@ const record = (overrides = {}) => ({
   ...overrides,
 })
 
-const renderPage = () => render(
-  <MemoryRouter initialEntries={['/records/r1']}>
-    <Routes>
-      <Route path="/records/:recordId" element={<RecordDetailMvpPage />} />
-      <Route path="/records" element={<p>记录目录页</p>} />
-    </Routes>
-  </MemoryRouter>,
-)
+const renderPage = () =>
+  render(
+    <MemoryRouter initialEntries={['/records/r1']}>
+      <Routes>
+        <Route path="/records/:recordId" element={<RecordDetailMvpPage />} />
+        <Route path="/records" element={<p>记录目录页</p>} />
+      </Routes>
+    </MemoryRouter>,
+  )
 
 describe('RecordDetailMvpPage', () => {
   beforeEach(() => {
@@ -71,8 +74,12 @@ describe('RecordDetailMvpPage', () => {
 
   it('shows the submission dialog only when the backend capability allows submission', async () => {
     const user = userEvent.setup()
-    fetchRecord.mockResolvedValue(record({ capabilities: { canEdit: true, canDelete: true, canSubmit: true } }))
-    fetchReviewerCandidates.mockResolvedValue([{ userId: 'reviewer-1', displayName: '审核人', role: 'REVIEWER' }])
+    fetchRecord.mockResolvedValue(
+      record({ capabilities: { canEdit: true, canDelete: true, canSubmit: true } }),
+    )
+    fetchReviewerCandidates.mockResolvedValue([
+      { userId: 'reviewer-1', displayName: '审核人', role: 'REVIEWER' },
+    ])
     renderPage()
 
     await user.click(await screen.findByRole('button', { name: '提交审核' }))

@@ -1,33 +1,37 @@
 package com.bionote.agent.fit;
 
 import com.bionote.common.ApiException;
-import org.apache.commons.math3.stat.regression.OLSMultipleLinearRegression;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Component;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.apache.commons.math3.stat.regression.OLSMultipleLinearRegression;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
 
 /**
- * Multivariate OLS with automatic dropping of constant / linearly dependent predictors
- * so fermentation tables with near-collinear process variables still produce a fit.
+ * Multivariate OLS with automatic dropping of constant / linearly dependent predictors so
+ * fermentation tables with near-collinear process variables still produce a fit.
  */
 @Component
 public class MultivariateFitEngine {
     private static final double VAR_EPS = 1e-12;
     private static final double CORR_EPS = 1.0 - 1e-9;
 
-    public FitModels.FitResult fit(List<String> xNames, String yName, double[][] xRows, double[] y,
-                                   List<FitModels.SkipInfo> skipped, List<String> usedRecordCodes) {
+    public FitModels.FitResult fit(
+            List<String> xNames,
+            String yName,
+            double[][] xRows,
+            double[] y,
+            List<FitModels.SkipInfo> skipped,
+            List<String> usedRecordCodes) {
         if (xNames == null || xNames.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "FIT_MISSING_MAPPING", "多元回归需要至少一个自变量列");
         }
         if (y == null || y.length < 3) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "FIT_INSUFFICIENT_POINTS",
-                    "多元回归至少需要 3 个有效样本行");
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST, "FIT_INSUFFICIENT_POINTS", "多元回归至少需要 3 个有效样本行");
         }
         if (xRows == null || xRows.length != y.length) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "FIT_FAILED", "自变量与因变量行数不一致");
@@ -35,14 +39,23 @@ public class MultivariateFitEngine {
 
         PrunedDesign pruned = prunePredictors(xNames, xRows, y.length);
         if (pruned.names.isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "FIT_FAILED",
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "FIT_FAILED",
                     "自变量在有效样本上均为常数或完全共线，无法做多元回归。请减少自变量或检查数据。");
         }
         int need = pruned.names.size() + 2;
         if (y.length < need) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "FIT_INSUFFICIENT_POINTS",
-                    "有效样本 " + y.length + " 行，相对保留的 " + pruned.names.size()
-                            + " 个自变量仍不足（至少需要 " + need + " 行）。已尝试剔除常数/共线列："
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "FIT_INSUFFICIENT_POINTS",
+                    "有效样本 "
+                            + y.length
+                            + " 行，相对保留的 "
+                            + pruned.names.size()
+                            + " 个自变量仍不足（至少需要 "
+                            + need
+                            + " 行）。已尝试剔除常数/共线列："
                             + (pruned.dropped.isEmpty() ? "无" : String.join("、", pruned.dropped)));
         }
 
@@ -65,7 +78,9 @@ public class MultivariateFitEngine {
                 equation.append(" + ").append(key).append("*").append(pruned.names.get(i));
             }
             if (!pruned.dropped.isEmpty()) {
-                equation.append("  [已剔除常数/共线列: ").append(String.join("、", pruned.dropped)).append("]");
+                equation.append("  [已剔除常数/共线列: ")
+                        .append(String.join("、", pruned.dropped))
+                        .append("]");
             }
 
             List<Map<String, Object>> pointViews = new ArrayList<>();
@@ -88,26 +103,30 @@ public class MultivariateFitEngine {
                     skipped == null ? List.of() : List.copyOf(skipped),
                     List.of(),
                     pointViews,
-                    List.of()
-            );
+                    List.of());
         } catch (ApiException e) {
             throw e;
         } catch (Exception e) {
             String detail = e.getMessage() == null ? "" : e.getMessage().toLowerCase(Locale.ROOT);
             if (detail.contains("singular")) {
-                throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "FIT_FAILED",
+                throw new ApiException(
+                        HttpStatus.UNPROCESSABLE_ENTITY,
+                        "FIT_FAILED",
                         "多元线性回归失败：自变量仍存在完全共线（或样本相对自变量过少）。"
-                                + "已剔除：" + (pruned.dropped.isEmpty() ? "无" : String.join("、", pruned.dropped))
+                                + "已剔除："
+                                + (pruned.dropped.isEmpty()
+                                        ? "无"
+                                        : String.join("、", pruned.dropped))
                                 + "。建议减少高度相关的过程变量后再试。");
             }
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "FIT_FAILED",
+            throw new ApiException(
+                    HttpStatus.UNPROCESSABLE_ENTITY,
+                    "FIT_FAILED",
                     "多元线性回归失败：" + (e.getMessage() == null ? "请检查数据是否含非数值或共线列" : e.getMessage()));
         }
     }
 
-    /**
-     * Drop zero-variance columns, then greedily keep a full-rank subset (and cap by n-2).
-     */
+    /** Drop zero-variance columns, then greedily keep a full-rank subset (and cap by n-2). */
     PrunedDesign prunePredictors(List<String> xNames, double[][] xRows, int n) {
         int p = xNames.size();
         List<Integer> candidates = new ArrayList<>();

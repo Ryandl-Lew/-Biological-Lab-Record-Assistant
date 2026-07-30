@@ -10,7 +10,9 @@ const qs = (params = {}) => {
 
 export const fetchTemplates = (params) => request(`/templates${qs(params)}`)
 export const fetchTemplate = (id) => request(`/templates/${id}`)
-export const createTemplate = (input) => request('/templates', { method: 'POST', body: JSON.stringify(input) })
-export const updateTemplate = (id, input) => request(`/templates/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+export const createTemplate = (input) =>
+  request('/templates', { method: 'POST', body: JSON.stringify(input) })
+export const updateTemplate = (id, input) =>
+  request(`/templates/${id}`, { method: 'PUT', body: JSON.stringify(input) })
 export const deleteTemplate = (id) => request(`/templates/${id}`, { method: 'DELETE' })
 export const copyTemplate = (id) => request(`/templates/${id}/copy`, { method: 'POST' })

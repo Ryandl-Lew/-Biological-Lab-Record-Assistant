@@ -9,4 +9,3 @@ public class BioNoteApplication {
         SpringApplication.run(BioNoteApplication.class, args);
     }
 }
-

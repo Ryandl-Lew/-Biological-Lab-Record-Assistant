@@ -1,5 +1,10 @@
 import { create } from 'zustand'
-import { getCurrentUser, login as loginApi, logout as logoutApi, register as registerApi } from '@/api/auth'
+import {
+  getCurrentUser,
+  login as loginApi,
+  logout as logoutApi,
+  register as registerApi,
+} from '@/api/auth'
 import { updateMyProfile, uploadMyAvatar } from '@/api/users'
 
 const clearToken = () => localStorage.removeItem('auth_token')
@@ -33,7 +38,11 @@ export const useAuthStore = create((set) => ({
   },
 
   register: async ({ displayName, email, password }) => {
-    const result = await registerApi({ displayName: displayName.trim(), email: email.trim(), password })
+    const result = await registerApi({
+      displayName: displayName.trim(),
+      email: email.trim(),
+      password,
+    })
     localStorage.setItem('auth_token', result.accessToken)
     set({ currentUser: result.user, token: result.accessToken, error: null })
     return result.user
@@ -52,7 +61,9 @@ export const useAuthStore = create((set) => ({
   },
 
   logout: async () => {
-    try { await logoutApi() } finally {
+    try {
+      await logoutApi()
+    } finally {
       clearToken()
       set({ currentUser: null, token: null })
     }

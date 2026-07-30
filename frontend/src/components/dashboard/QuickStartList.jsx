@@ -15,7 +15,9 @@ export default function QuickStartList() {
   const navigate = useNavigate()
   return (
     <nav aria-label="快速开始" className="space-y-0.5">
-      <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-slate-400">开始</h2>
+      <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
+        开始
+      </h2>
       {ITEMS.map((item) => (
         <button
           key={item.key}

@@ -6,7 +6,9 @@ const frontendPort = process.env.E2E_FRONTEND_PORT || '5173'
 const frontendOrigin = `http://127.0.0.1:${frontendPort}`
 const outputDir = process.env.E2E_OUTPUT_DIR || 'test-results'
 const htmlReportDir = process.env.E2E_HTML_REPORT_DIR || 'playwright-report'
-const databaseUrl = process.env.E2E_DB_URL || 'jdbc:mysql://127.0.0.1:3306/bionote?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC'
+const databaseUrl =
+  process.env.E2E_DB_URL ||
+  'jdbc:mysql://127.0.0.1:3306/bionote?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC'
 const h2Database = databaseUrl.startsWith('jdbc:h2:')
 
 export default defineConfig({

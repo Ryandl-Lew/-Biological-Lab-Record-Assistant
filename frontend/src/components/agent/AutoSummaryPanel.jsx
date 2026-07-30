@@ -14,7 +14,15 @@ import { AGENT_ARTIFACT_KIND, ACTIVE_AGENT_RUN_STATUSES, AGENT_RUN_STATUS } from
 import { Badge, Button, EmptyState, Surface } from '@/components/ui'
 import { agentErrorMessage } from './messages'
 import AgentArtifactView from './AgentArtifactView'
-import { Activity, CheckCircle2, ChevronDown, ChevronRight, Clock, FileText, Loader2 } from 'lucide-react'
+import {
+  Activity,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  FileText,
+  Loader2,
+} from 'lucide-react'
 
 const newKey = () => globalThis.crypto?.randomUUID?.() || `summary-${Date.now()}-${Math.random()}`
 
@@ -50,21 +58,34 @@ function StepItem({ step, isActive, isDone }) {
   const Icon = isActive ? Loader2 : isDone ? CheckCircle2 : Clock
   const label = getStepLabel(step)
   return (
-    <div className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs ${
-      isActive ? 'border-brand-200 bg-brand-50 text-brand-700' :
-      isDone ? 'border-emerald-200 bg-emerald-50 text-emerald-700' :
-      'border-slate-100 bg-white text-slate-400'
-    }`}>
-      <Icon size={12} className={isActive ? 'animate-spin text-brand-500' : isDone ? 'text-emerald-500' : 'text-slate-300'} />
+    <div
+      className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs ${
+        isActive
+          ? 'border-brand-200 bg-brand-50 text-brand-700'
+          : isDone
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            : 'border-slate-100 bg-white text-slate-400'
+      }`}
+    >
+      <Icon
+        size={12}
+        className={
+          isActive ? 'animate-spin text-brand-500' : isDone ? 'text-emerald-500' : 'text-slate-300'
+        }
+      />
       <span className="flex-1">{label}</span>
-      {step.latencyMs != null && step.latencyMs > 0 && <span className="text-xs text-slate-400">{step.latencyMs}ms</span>}
+      {step.latencyMs != null && step.latencyMs > 0 && (
+        <span className="text-xs text-slate-400">{step.latencyMs}ms</span>
+      )}
     </div>
   )
 }
 
 export default function AutoSummaryPanel({ subjectType, subjectId }) {
   const isRecord = subjectType === 'record'
-  const artifactKind = isRecord ? AGENT_ARTIFACT_KIND.RECORD_SUMMARY : AGENT_ARTIFACT_KIND.PROJECT_PROGRESS
+  const artifactKind = isRecord
+    ? AGENT_ARTIFACT_KIND.RECORD_SUMMARY
+    : AGENT_ARTIFACT_KIND.PROJECT_PROGRESS
   const fetchArtifacts = isRecord
     ? () => fetchRecordArtifacts(subjectId)
     : () => fetchProjectArtifacts(subjectId)
@@ -87,10 +108,14 @@ export default function AutoSummaryPanel({ subjectType, subjectId }) {
     try {
       const result = await fetchArtifacts()
       setHistory(result.items || [])
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }, [])
 
-  useEffect(() => { loadHistory() }, [loadHistory])
+  useEffect(() => {
+    loadHistory()
+  }, [loadHistory])
 
   // Poll run status
   useEffect(() => {
@@ -121,11 +146,17 @@ export default function AutoSummaryPanel({ subjectType, subjectId }) {
           try {
             const stepsData = await fetchAgentSteps(runId)
             setSteps(stepsData.items || [])
-          } catch { /* steps are optional */ }
+          } catch {
+            /* steps are optional */
+          }
           const delays = [1500, 2500, 4000]
           timer.current = setTimeout(poll, delays[Math.min(attempt.current++, delays.length - 1)])
         }
-        if (value.status === AGENT_RUN_STATUS.FAILED || value.status === AGENT_RUN_STATUS.LIMIT_EXCEEDED || value.status === AGENT_RUN_STATUS.INVALID_OUTPUT) {
+        if (
+          value.status === AGENT_RUN_STATUS.FAILED ||
+          value.status === AGENT_RUN_STATUS.LIMIT_EXCEEDED ||
+          value.status === AGENT_RUN_STATUS.INVALID_OUTPUT
+        ) {
           setError(agentErrorMessage(value))
           setRunId(null)
         }
@@ -138,7 +169,10 @@ export default function AutoSummaryPanel({ subjectType, subjectId }) {
     }
     attempt.current = 0
     poll()
-    return () => { cancelled = true; clearTimeout(timer.current) }
+    return () => {
+      cancelled = true
+      clearTimeout(timer.current)
+    }
   }, [runId])
 
   const start = async () => {
@@ -188,7 +222,13 @@ export default function AutoSummaryPanel({ subjectType, subjectId }) {
     try {
       const detail = await fetchAgentArtifact(summary.id)
       setArtifact(detail)
-      const relatedRun = { id: summary.runId, provider: '', model: '', artifactKind: summary.artifactKind, createdAt: summary.createdAt }
+      const relatedRun = {
+        id: summary.runId,
+        provider: '',
+        model: '',
+        artifactKind: summary.artifactKind,
+        createdAt: summary.createdAt,
+      }
       setArtifactRun(relatedRun)
       setShowHistory(false)
     } catch (requestError) {
@@ -207,7 +247,9 @@ export default function AutoSummaryPanel({ subjectType, subjectId }) {
       </p>
 
       {error && (
-        <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>
+        <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </p>
       )}
 
       {/* Running state */}
@@ -221,53 +263,61 @@ export default function AutoSummaryPanel({ subjectType, subjectId }) {
                   {run.status === 'QUEUED' ? '等待处理...' : '正在分析并生成报告...'}
                 </p>
                 <p className="mt-0.5 text-xs text-brand-600">
-                  已执行 {run.stepCount} 步 | {run.toolCallCount} 次工具调用 | {run.inputTokens + run.outputTokens} tokens
+                  已执行 {run.stepCount} 步 | {run.toolCallCount} 次工具调用 |{' '}
+                  {run.inputTokens + run.outputTokens} tokens
                 </p>
               </div>
             </div>
           </div>
 
-          {steps.length > 0 && (() => {
-            const VISIBLE = 6
-            const collapsed = steps.length > VISIBLE && !showAllSteps
-            const visibleSteps = collapsed ? steps.slice(-VISIBLE) : steps
-            const hiddenCount = steps.length - VISIBLE
-            return (
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-slate-500">执行步骤 ({steps.length})</p>
-                  {steps.length > VISIBLE && (
-                    <button
-                      onClick={() => setShowAllSteps(!showAllSteps)}
-                      className="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700"
-                    >
-                      {showAllSteps ? (
-                        <><ChevronRight size={12} className="rotate-90" />收起</>
-                      ) : (
-                        <><ChevronDown size={12} />展开全部</>
-                      )}
-                    </button>
-                  )}
-                </div>
-                {collapsed && (
-                  <div className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-400">
-                    已完成 {hiddenCount} 个步骤
+          {steps.length > 0 &&
+            (() => {
+              const VISIBLE = 6
+              const collapsed = steps.length > VISIBLE && !showAllSteps
+              const visibleSteps = collapsed ? steps.slice(-VISIBLE) : steps
+              const hiddenCount = steps.length - VISIBLE
+              return (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-slate-500">执行步骤 ({steps.length})</p>
+                    {steps.length > VISIBLE && (
+                      <button
+                        onClick={() => setShowAllSteps(!showAllSteps)}
+                        className="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700"
+                      >
+                        {showAllSteps ? (
+                          <>
+                            <ChevronRight size={12} className="rotate-90" />
+                            收起
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown size={12} />
+                            展开全部
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
-                )}
-                {visibleSteps.map((step, index) => {
-                  const actualIndex = collapsed ? index + hiddenCount : index
-                  return (
-                    <StepItem
-                      key={step.stepNo || index}
-                      step={step}
-                      isActive={actualIndex === steps.length - 1 && isRunning}
-                      isDone={actualIndex < steps.length - 1 || !isRunning}
-                    />
-                  )
-                })}
-              </div>
-            )
-          })()}
+                  {collapsed && (
+                    <div className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-400">
+                      已完成 {hiddenCount} 个步骤
+                    </div>
+                  )}
+                  {visibleSteps.map((step, index) => {
+                    const actualIndex = collapsed ? index + hiddenCount : index
+                    return (
+                      <StepItem
+                        key={step.stepNo || index}
+                        step={step}
+                        isActive={actualIndex === steps.length - 1 && isRunning}
+                        isDone={actualIndex < steps.length - 1 || !isRunning}
+                      />
+                    )
+                  })}
+                </div>
+              )
+            })()}
 
           {steps.length === 0 && (
             <div className="space-y-2">
@@ -279,7 +329,9 @@ export default function AutoSummaryPanel({ subjectType, subjectId }) {
           )}
 
           <div className="flex gap-2">
-            <Button size="sm" variant="secondary" onClick={cancel}>取消</Button>
+            <Button size="sm" variant="secondary" onClick={cancel}>
+              取消
+            </Button>
           </div>
         </div>
       )}
@@ -289,7 +341,9 @@ export default function AutoSummaryPanel({ subjectType, subjectId }) {
         <div className="mt-4 space-y-3">
           <AgentArtifactView artifact={artifact} run={artifactRun} />
           <div className="flex gap-2">
-            <Button size="sm" onClick={rerun}>重新生成</Button>
+            <Button size="sm" onClick={rerun}>
+              重新生成
+            </Button>
             {history.length > 0 && (
               <Button size="sm" variant="secondary" onClick={() => setShowHistory(!showHistory)}>
                 历史总结 ({history.length})
@@ -311,7 +365,9 @@ export default function AutoSummaryPanel({ subjectType, subjectId }) {
               >
                 <span>
                   <b className="block truncate max-w-xs">{item.headline || '未命名报告'}</b>
-                  <span className="text-xs text-slate-400">{new Date(item.createdAt).toLocaleString()}</span>
+                  <span className="text-xs text-slate-400">
+                    {new Date(item.createdAt).toLocaleString()}
+                  </span>
                 </span>
                 <Badge>{item.artifactKind === 'RECORD_SUMMARY' ? '记录总结' : '项目进展'}</Badge>
               </button>
@@ -326,7 +382,12 @@ export default function AutoSummaryPanel({ subjectType, subjectId }) {
           {history.length > 0 && !showHistory && (
             <p className="mb-3 text-xs text-slate-400">
               已有 {history.length} 份历史总结，
-              <button onClick={() => setShowHistory(true)} className="text-brand-600 hover:underline">查看</button>
+              <button
+                onClick={() => setShowHistory(true)}
+                className="text-brand-600 hover:underline"
+              >
+                查看
+              </button>
             </p>
           )}
           <Button icon={FileText} onClick={start}>
@@ -348,9 +409,11 @@ export default function AutoSummaryPanel({ subjectType, subjectId }) {
         <EmptyState
           icon={Activity}
           title={isRecord ? '暂无记录总结' : '暂无项目总结'}
-          description={isRecord
-            ? '点击上方按钮，AI 将自动分析本记录并生成结构化报告。'
-            : '点击上方按钮，AI 将自动分析项目下所有记录并生成进展报告。'}
+          description={
+            isRecord
+              ? '点击上方按钮，AI 将自动分析本记录并生成结构化报告。'
+              : '点击上方按钮，AI 将自动分析项目下所有记录并生成进展报告。'
+          }
         />
       )}
     </Surface>

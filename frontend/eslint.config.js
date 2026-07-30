@@ -7,7 +7,12 @@ export default [
   { ignores: ['dist', 'coverage', 'playwright-report*/**', 'test-results*/**', 'node_modules'] },
   {
     files: ['**/*.{js,jsx}'],
-    languageOptions: { ecmaVersion: 2022, sourceType: 'module', globals: globals.browser, parserOptions: { ecmaFeatures: { jsx: true } } },
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: globals.browser,
+      parserOptions: { ecmaFeatures: { jsx: true } },
+    },
     plugins: { 'react-hooks': reactHooks, 'react-refresh': reactRefresh },
     rules: {
       ...js.configs.recommended.rules,

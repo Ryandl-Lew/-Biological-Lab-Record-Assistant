@@ -12,8 +12,12 @@ import org.springframework.stereotype.Component;
 public class DevDataSeeder implements ApplicationRunner {
     private final DemoDataService demoDataService;
 
-    public DevDataSeeder(DemoDataService demoDataService) { this.demoDataService = demoDataService; }
+    public DevDataSeeder(DemoDataService demoDataService) {
+        this.demoDataService = demoDataService;
+    }
 
     @Override
-    public void run(ApplicationArguments args) { demoDataService.seed(); }
+    public void run(ApplicationArguments args) {
+        demoDataService.seed();
+    }
 }

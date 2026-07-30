@@ -4,10 +4,17 @@ import { API_BASE, apiCall, createProjectApi, loginUi, registerAccount, unique }
 const TERMINAL = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED', 'LIMIT_EXCEEDED', 'INVALID_OUTPUT'])
 
 async function createScenarioRun(request, owner, projectId, scenario) {
-  return apiCall(request, 'POST', `/projects/${projectId}/agent-runs`, owner.token, {
-    artifactKind: 'PROJECT_PROGRESS',
-    focus: `__FAKE_SCENARIO__:${scenario}`,
-  }, { 'Idempotency-Key': unique(`agent-${scenario}`) })
+  return apiCall(
+    request,
+    'POST',
+    `/projects/${projectId}/agent-runs`,
+    owner.token,
+    {
+      artifactKind: 'PROJECT_PROGRESS',
+      focus: `__FAKE_SCENARIO__:${scenario}`,
+    },
+    { 'Idempotency-Key': unique(`agent-${scenario}`) },
+  )
 }
 
 async function waitForRun(request, owner, runId) {
@@ -24,7 +31,10 @@ async function waitForRun(request, owner, runId) {
   throw new Error(`Agent run ${runId} did not become terminal`)
 }
 
-test('fake failure modes and cancellation never create an empty success artifact', async ({ page, request }) => {
+test('fake failure modes and cancellation never create an empty success artifact', async ({
+  page,
+  request,
+}) => {
   const owner = await registerAccount(request, 'Agent Failure Owner')
   const project = await createProjectApi(request, owner, unique('agent-failure-project'))
   const expected = [
@@ -45,13 +55,20 @@ test('fake failure modes and cancellation never create an empty success artifact
   }
 
   const cancellable = await createScenarioRun(request, owner, project.id, 'invalid-output')
-  const cancelled = await apiCall(request, 'POST', `/agent-runs/${cancellable.id}/cancel`, owner.token)
+  const cancelled = await apiCall(
+    request,
+    'POST',
+    `/agent-runs/${cancellable.id}/cancel`,
+    owner.token,
+  )
   expect(cancelled.status).toBe('CANCELLED')
   expect((await waitForRun(request, owner, cancellable.id)).artifactId).toBeNull()
 
   await loginUi(page, owner)
   await page.goto(`/projects/${project.id}?tab=progress&run=${runs[0].id}`)
-  await expect(page.getByText('模型结果未通过结构或证据校验', { exact: true })).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText('模型结果未通过结构或证据校验', { exact: true })).toBeVisible({
+    timeout: 15_000,
+  })
   await expect(page.getByText('项目进展证据摘要')).toHaveCount(0)
 
   await page.goto(`/projects/${project.id}?tab=progress&run=${runs[2].id}`)

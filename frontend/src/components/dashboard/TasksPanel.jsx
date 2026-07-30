@@ -6,7 +6,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowUpRight, Check, Hourglass, ListChecks, Undo2, UserPlus, X } from 'lucide-react'
-import { acceptInvitation, fetchDashboardSummary, fetchDashboardTasks, rejectInvitation } from '@/api'
+import {
+  acceptInvitation,
+  fetchDashboardSummary,
+  fetchDashboardTasks,
+  rejectInvitation,
+} from '@/api'
 import { Button, EmptyState } from '@/components/ui'
 import formatRelativeTime from '@/lib/formatRelativeTime'
 
@@ -46,7 +51,9 @@ export default function TasksPanel() {
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
   const respondInvitation = async (task, accepted) => {
     setBusyId(task.id)
@@ -63,14 +70,20 @@ export default function TasksPanel() {
     }
   }
 
-  const totalPending = (summary?.changesRequestedCount ?? 0)
-    + (summary?.pendingReviewCount ?? 0)
-    + (summary?.pendingInvitationCount ?? 0)
+  const totalPending =
+    (summary?.changesRequestedCount ?? 0) +
+    (summary?.pendingReviewCount ?? 0) +
+    (summary?.pendingInvitationCount ?? 0)
 
   return (
-    <section aria-label="待处理事项" className="rounded-2xl border border-slate-200/60 bg-white/40 p-5 shadow-card backdrop-blur-sm">
+    <section
+      aria-label="待处理事项"
+      className="rounded-2xl border border-slate-200/60 bg-white/40 p-5 shadow-card backdrop-blur-sm"
+    >
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">待处理事项</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+          待处理事项
+        </h2>
         {!loading && (
           <span className="text-xs text-slate-500">
             {totalPending > 0 ? `${totalPending} 项待处理` : '已清空'}
@@ -78,12 +91,20 @@ export default function TasksPanel() {
         )}
       </div>
 
-      {error && <p role="alert" className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {error && (
+        <p role="alert" className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </p>
+      )}
 
       {loading ? (
         <p className="py-8 text-center text-sm text-slate-400">加载待办中…</p>
       ) : tasks.length === 0 ? (
-        <EmptyState icon={ListChecks} title="待办已清空" description="当前没有需要处理的审核、修改或项目邀请。" />
+        <EmptyState
+          icon={ListChecks}
+          title="待办已清空"
+          description="当前没有需要处理的审核、修改或项目邀请。"
+        />
       ) : (
         <ul className="space-y-2">
           {tasks.map((task) => {
@@ -92,16 +113,24 @@ export default function TasksPanel() {
             const path = taskPath(task)
             const target = task.stale || !path ? null : path
             return (
-              <li key={task.id} className="rounded-lg border border-slate-100 p-3 transition hover:border-slate-200">
+              <li
+                key={task.id}
+                className="rounded-lg border border-slate-100 p-3 transition hover:border-slate-200"
+              >
                 <div className="flex items-start gap-3">
-                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${config.box}`}>
+                  <span
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${config.box}`}
+                  >
                     <Icon size={16} strokeWidth={1.8} />
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium text-slate-900">{task.title}</span>
+                      <span className="truncate text-sm font-medium text-slate-900">
+                        {task.title}
+                      </span>
                       <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">
-                        {config.label}{task.revisionNo ? ` · R${task.revisionNo}` : ''}
+                        {config.label}
+                        {task.revisionNo ? ` · R${task.revisionNo}` : ''}
                       </span>
                     </div>
                     <p className="mt-1 truncate text-xs text-slate-400">
@@ -115,8 +144,23 @@ export default function TasksPanel() {
                     <p className="mt-2 pl-12 text-xs text-slate-400">已失效</p>
                   ) : (
                     <div className="mt-2 flex gap-2 pl-12">
-                      <Button size="sm" icon={Check} loading={busyId === task.id} onClick={() => respondInvitation(task, true)}>接受</Button>
-                      <Button size="sm" variant="secondary" icon={X} disabled={busyId === task.id} onClick={() => respondInvitation(task, false)}>拒绝</Button>
+                      <Button
+                        size="sm"
+                        icon={Check}
+                        loading={busyId === task.id}
+                        onClick={() => respondInvitation(task, true)}
+                      >
+                        接受
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        icon={X}
+                        disabled={busyId === task.id}
+                        onClick={() => respondInvitation(task, false)}
+                      >
+                        拒绝
+                      </Button>
                     </div>
                   )
                 ) : (

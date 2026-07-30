@@ -4,20 +4,20 @@
 
 ## 1. 统一术语
 
-| 术语 | 定义 |
-|---|---|
-| Working Copy | `experiment_records` 中当前可变工作副本；不是历史 revision |
-| Record Revision | 每次提交审核产生的不可变快照，展示为 R1、R2、R3 |
-| Revision Summary | 列表使用的轻量投影，不含完整 snapshot 和大正文 |
-| Revision Detail | 单一 revision 的完整可见快照、附件、提交和审核信息 |
-| Revision Diff | 两个 snapshot source 之间的结构化领域差异 |
-| Restore Preview | 基于当前工作副本即时计算的恢复影响，不产生写入 |
-| Restore Operation | 已确认并成功提交的恢复动作，只追加保存 |
-| Agent Run | 一次有界 Agent 执行实例 |
-| Agent Step | Run 中可观测的模型、工具、验证、输出或错误步骤 |
-| Agent Artifact | 验证通过并持久化的记录总结或项目进展报告 |
-| Evidence Reference | Artifact 中指向真实项目对象或 Diff 的稳定证据引用 |
-| Trace Replay | 读取并重现已存 step 时间线，不重新调用模型或工具 |
+| 术语               | 定义                                                       |
+| ------------------ | ---------------------------------------------------------- |
+| Working Copy       | `experiment_records` 中当前可变工作副本；不是历史 revision |
+| Record Revision    | 每次提交审核产生的不可变快照，展示为 R1、R2、R3            |
+| Revision Summary   | 列表使用的轻量投影，不含完整 snapshot 和大正文             |
+| Revision Detail    | 单一 revision 的完整可见快照、附件、提交和审核信息         |
+| Revision Diff      | 两个 snapshot source 之间的结构化领域差异                  |
+| Restore Preview    | 基于当前工作副本即时计算的恢复影响，不产生写入             |
+| Restore Operation  | 已确认并成功提交的恢复动作，只追加保存                     |
+| Agent Run          | 一次有界 Agent 执行实例                                    |
+| Agent Step         | Run 中可观测的模型、工具、验证、输出或错误步骤             |
+| Agent Artifact     | 验证通过并持久化的记录总结或项目进展报告                   |
+| Evidence Reference | Artifact 中指向真实项目对象或 Diff 的稳定证据引用          |
+| Trace Replay       | 读取并重现已存 step 时间线，不重新调用模型或工具           |
 
 ## 2. 既有不变量
 
@@ -113,12 +113,12 @@
 
 V1-V8 已应用，禁止修改。第二阶段固定分配：
 
-| Migration | 所有者 | 内容 |
-|---|---|---|
-| `V9__phase2_revision_metadata.sql` | Revision 模块 | revision schema version、历史查询索引 |
-| `V10__create_record_restore_operations.sql` | Restore 模块 | 恢复操作、幂等和来源追溯 |
-| `V11__create_agent_runtime.sql` | Agent Runtime | prompt、run、step、artifact 表和索引 |
-| `V12__phase2_integration_indexes.sql` | 集成负责人 | 经实际查询计划验证后补充的跨模块索引；无必要则不创建，但编号继续保留 |
+| Migration                                   | 所有者        | 内容                                                                 |
+| ------------------------------------------- | ------------- | -------------------------------------------------------------------- |
+| `V9__phase2_revision_metadata.sql`          | Revision 模块 | revision schema version、历史查询索引                                |
+| `V10__create_record_restore_operations.sql` | Restore 模块  | 恢复操作、幂等和来源追溯                                             |
+| `V11__create_agent_runtime.sql`             | Agent Runtime | prompt、run、step、artifact 表和索引                                 |
+| `V12__phase2_integration_indexes.sql`       | 集成负责人    | 经实际查询计划验证后补充的跨模块索引；无必要则不创建，但编号继续保留 |
 
 不得为了分支方便使用未分配的 V9/V10/V11 文件名，也不得在两个 migration 中重复创建相同对象。
 
@@ -139,20 +139,20 @@ V9 新增：
 
 ### 5.2 `record_restore_operations`
 
-| 字段 | 规则 |
-|---|---|
-| `id CHAR(36)` | 主键 |
-| `record_id CHAR(36)` | 目标记录，外键 |
-| `source_revision_id CHAR(36)` | 来源 revision，外键 |
-| `actor_id CHAR(36)` | 执行创建者，外键 |
-| `before_record_version BIGINT` | 执行前乐观锁版本 |
-| `after_record_version BIGINT` | 执行后版本，必须大于 before |
-| `before_content_hash CHAR(64)` | 执行前规范化工作副本哈希 |
-| `after_content_hash CHAR(64)` | 恢复后规范化工作副本哈希 |
-| `diff_summary_json TEXT` | 实际执行时重新计算的差异摘要 |
-| `idempotency_key VARCHAR(160)` | 非空 |
-| `payload_hash CHAR(64)` | 规范化执行请求哈希，用于识别同 key 不同 payload |
-| `restored_at TIMESTAMP(6)` | UTC |
+| 字段                           | 规则                                            |
+| ------------------------------ | ----------------------------------------------- |
+| `id CHAR(36)`                  | 主键                                            |
+| `record_id CHAR(36)`           | 目标记录，外键                                  |
+| `source_revision_id CHAR(36)`  | 来源 revision，外键                             |
+| `actor_id CHAR(36)`            | 执行创建者，外键                                |
+| `before_record_version BIGINT` | 执行前乐观锁版本                                |
+| `after_record_version BIGINT`  | 执行后版本，必须大于 before                     |
+| `before_content_hash CHAR(64)` | 执行前规范化工作副本哈希                        |
+| `after_content_hash CHAR(64)`  | 恢复后规范化工作副本哈希                        |
+| `diff_summary_json TEXT`       | 实际执行时重新计算的差异摘要                    |
+| `idempotency_key VARCHAR(160)` | 非空                                            |
+| `payload_hash CHAR(64)`        | 规范化执行请求哈希，用于识别同 key 不同 payload |
+| `restored_at TIMESTAMP(6)`     | UTC                                             |
 
 约束：
 
@@ -162,18 +162,18 @@ V9 新增：
 
 ### 5.3 `prompt_versions`
 
-| 字段 | 规则 |
-|---|---|
-| `id CHAR(36)` | 主键 |
-| `prompt_name VARCHAR(100)` | 例如 `project-progress` |
-| `version_no INT` | 从 1 递增 |
-| `template_text TEXT` | 完整 system/template 文本，不含 secret |
-| `output_schema_json TEXT` | 该版本要求的 JSON Schema |
-| `tool_policy_json TEXT` | 允许的 tool name 和限制 |
-| `content_hash CHAR(64)` | 规范化模板与 schema 的 SHA-256 |
-| `active BOOLEAN` | 是否为新 run 默认版本 |
+| 字段                                | 规则                                                             |
+| ----------------------------------- | ---------------------------------------------------------------- |
+| `id CHAR(36)`                       | 主键                                                             |
+| `prompt_name VARCHAR(100)`          | 例如 `project-progress`                                          |
+| `version_no INT`                    | 从 1 递增                                                        |
+| `template_text TEXT`                | 完整 system/template 文本，不含 secret                           |
+| `output_schema_json TEXT`           | 该版本要求的 JSON Schema                                         |
+| `tool_policy_json TEXT`             | 允许的 tool name 和限制                                          |
+| `content_hash CHAR(64)`             | 规范化模板与 schema 的 SHA-256                                   |
+| `active BOOLEAN`                    | 是否为新 run 默认版本                                            |
 | `active_name_key VARCHAR(100) NULL` | active 行写 prompt_name，inactive 写 NULL，用唯一键保证单 active |
-| `created_at TIMESTAMP(6)` | UTC |
+| `created_at TIMESTAMP(6)`           | UTC                                                              |
 
 约束：
 
@@ -184,35 +184,35 @@ V9 新增：
 
 ### 5.4 `agent_runs`
 
-| 字段 | 规则 |
-|---|---|
-| `id CHAR(36)` | 主键 |
-| `artifact_kind VARCHAR(30)` | `RECORD_SUMMARY`/`PROJECT_PROGRESS` |
-| `subject_type VARCHAR(20)` | `RECORD`/`PROJECT` |
-| `subject_id CHAR(36)` | 目标 ID |
-| `project_id CHAR(36)` | 授权与查询范围，外键 |
-| `record_id CHAR(36) NULL` | record run 时非空，外键 |
-| `requested_by CHAR(36)` | 发起用户，外键 |
-| `trigger_type VARCHAR(20)` | 统一枚举 |
-| `status VARCHAR(30)` | run 状态 |
-| `provider VARCHAR(60)` | 实际 provider |
-| `model VARCHAR(120)` | 实际 model |
-| `prompt_version_id CHAR(36)` | 外键，创建时固定 |
-| `parent_run_id CHAR(36) NULL` | rerun 来源 |
-| `idempotency_key VARCHAR(160)` | 非空 |
-| `request_json TEXT` | 经过长度校验的原始 run 参数，如 focus/period；不含 secret |
-| `payload_hash CHAR(64)` | 规范化 run 请求哈希，用于幂等冲突判断 |
-| `input_cursor_json TEXT` | 时间窗、截止 audit cursor、subject version 等 |
-| `limits_json TEXT` | 本 run 固定限制快照 |
-| `step_count INT` | 默认 0 |
-| `tool_call_count INT` | 默认 0 |
-| `input_tokens BIGINT` | 默认 0 |
-| `output_tokens BIGINT` | 默认 0 |
-| `error_code VARCHAR(80) NULL` | 稳定机器码 |
-| `error_message VARCHAR(1000) NULL` | 脱敏消息 |
-| `cancel_requested_at TIMESTAMP(6) NULL` | RUNNING run 的协作式取消标记 |
-| `created_at/started_at/finished_at` | UTC |
-| `version BIGINT` | worker 领取与状态更新乐观锁 |
+| 字段                                    | 规则                                                      |
+| --------------------------------------- | --------------------------------------------------------- |
+| `id CHAR(36)`                           | 主键                                                      |
+| `artifact_kind VARCHAR(30)`             | `RECORD_SUMMARY`/`PROJECT_PROGRESS`                       |
+| `subject_type VARCHAR(20)`              | `RECORD`/`PROJECT`                                        |
+| `subject_id CHAR(36)`                   | 目标 ID                                                   |
+| `project_id CHAR(36)`                   | 授权与查询范围，外键                                      |
+| `record_id CHAR(36) NULL`               | record run 时非空，外键                                   |
+| `requested_by CHAR(36)`                 | 发起用户，外键                                            |
+| `trigger_type VARCHAR(20)`              | 统一枚举                                                  |
+| `status VARCHAR(30)`                    | run 状态                                                  |
+| `provider VARCHAR(60)`                  | 实际 provider                                             |
+| `model VARCHAR(120)`                    | 实际 model                                                |
+| `prompt_version_id CHAR(36)`            | 外键，创建时固定                                          |
+| `parent_run_id CHAR(36) NULL`           | rerun 来源                                                |
+| `idempotency_key VARCHAR(160)`          | 非空                                                      |
+| `request_json TEXT`                     | 经过长度校验的原始 run 参数，如 focus/period；不含 secret |
+| `payload_hash CHAR(64)`                 | 规范化 run 请求哈希，用于幂等冲突判断                     |
+| `input_cursor_json TEXT`                | 时间窗、截止 audit cursor、subject version 等             |
+| `limits_json TEXT`                      | 本 run 固定限制快照                                       |
+| `step_count INT`                        | 默认 0                                                    |
+| `tool_call_count INT`                   | 默认 0                                                    |
+| `input_tokens BIGINT`                   | 默认 0                                                    |
+| `output_tokens BIGINT`                  | 默认 0                                                    |
+| `error_code VARCHAR(80) NULL`           | 稳定机器码                                                |
+| `error_message VARCHAR(1000) NULL`      | 脱敏消息                                                  |
+| `cancel_requested_at TIMESTAMP(6) NULL` | RUNNING run 的协作式取消标记                              |
+| `created_at/started_at/finished_at`     | UTC                                                       |
+| `version BIGINT`                        | worker 领取与状态更新乐观锁                               |
 
 约束：
 
@@ -222,19 +222,19 @@ V9 新增：
 
 ### 5.5 `agent_steps`
 
-| 字段 | 规则 |
-|---|---|
-| `id CHAR(36)` | 主键 |
-| `run_id CHAR(36)` | 外键 |
-| `step_no INT` | run 内从 1 递增 |
-| `step_type VARCHAR(30)` | 统一枚举 |
-| `tool_name VARCHAR(100) NULL` | tool step 时使用 |
-| `request_json TEXT NULL` | 裁剪、脱敏后的参数或模型 envelope |
-| `response_json TEXT NULL` | 裁剪、脱敏后的结果摘要 |
-| `content_hash CHAR(64)` | step 可见内容哈希 |
-| `latency_ms BIGINT` | 非负 |
-| `input_tokens/output_tokens BIGINT` | 可空或 0 |
-| `created_at TIMESTAMP(6)` | UTC |
+| 字段                                | 规则                              |
+| ----------------------------------- | --------------------------------- |
+| `id CHAR(36)`                       | 主键                              |
+| `run_id CHAR(36)`                   | 外键                              |
+| `step_no INT`                       | run 内从 1 递增                   |
+| `step_type VARCHAR(30)`             | 统一枚举                          |
+| `tool_name VARCHAR(100) NULL`       | tool step 时使用                  |
+| `request_json TEXT NULL`            | 裁剪、脱敏后的参数或模型 envelope |
+| `response_json TEXT NULL`           | 裁剪、脱敏后的结果摘要            |
+| `content_hash CHAR(64)`             | step 可见内容哈希                 |
+| `latency_ms BIGINT`                 | 非负                              |
+| `input_tokens/output_tokens BIGINT` | 可空或 0                          |
+| `created_at TIMESTAMP(6)`           | UTC                               |
 
 约束：
 
@@ -243,17 +243,17 @@ V9 新增：
 
 ### 5.6 `agent_artifacts`
 
-| 字段 | 规则 |
-|---|---|
-| `id CHAR(36)` | 主键 |
-| `run_id CHAR(36)` | 唯一外键，一次成功 run 一个 artifact |
-| `artifact_kind VARCHAR(30)` | 与 run 一致 |
-| `project_id CHAR(36)` | 外键 |
-| `record_id CHAR(36) NULL` | record summary 时非空 |
-| `content_json TEXT` | 通过 Schema 的结构化输出 |
-| `evidence_json TEXT` | 规范化证据索引，也可从 content 派生 |
-| `content_hash CHAR(64)` | artifact 规范化哈希 |
-| `created_at TIMESTAMP(6)` | UTC |
+| 字段                        | 规则                                 |
+| --------------------------- | ------------------------------------ |
+| `id CHAR(36)`               | 主键                                 |
+| `run_id CHAR(36)`           | 唯一外键，一次成功 run 一个 artifact |
+| `artifact_kind VARCHAR(30)` | 与 run 一致                          |
+| `project_id CHAR(36)`       | 外键                                 |
+| `record_id CHAR(36) NULL`   | record summary 时非空                |
+| `content_json TEXT`         | 通过 Schema 的结构化输出             |
+| `evidence_json TEXT`        | 规范化证据索引，也可从 content 派生  |
+| `content_hash CHAR(64)`     | artifact 规范化哈希                  |
+| `created_at TIMESTAMP(6)`   | UTC                                  |
 
 artifact 只追加。重新生成创建新 run 和新 artifact。
 
@@ -366,10 +366,7 @@ artifact 只追加。重新生成创建新 run 和新 artifact。
   "previewToken": "signed-or-random-server-token",
   "expiresAt": "2026-07-26T10:05:00Z",
   "diff": { "summary": {}, "sections": [] },
-  "warnings": [
-    "将重新启用 1 个历史附件",
-    "将软删除当前工作副本新增的 2 个附件"
-  ],
+  "warnings": ["将重新启用 1 个历史附件", "将软删除当前工作副本新增的 2 个附件"],
   "capabilities": { "canExecute": true }
 }
 ```
@@ -524,20 +521,20 @@ Replay 直接使用 run 与 steps 查询，不需要单独写接口。
 
 ## 10. 权限矩阵
 
-| 动作 | OWNER | MEMBER | REVIEWER |
-|---|:---:|:---:|:---:|
-| 查看项目内 revision | 是 | 是 | 是 |
-| 比较项目内同记录 revision | 是 | 是 | 是 |
-| 比较 revision 与工作副本 | 是 | 是 | 是，仅读取可见工作副本 |
-| 执行恢复 | 仅自己创建的可编辑记录 | 仅自己创建的可编辑记录 | 否 |
-| 查看恢复历史 | 是 | 是 | 是 |
-| 生成自己的记录总结 | 是 | 是 | 否 |
-| 查看项目内记录总结 | 是 | 是 | 是 |
-| 生成项目进展报告 | 是 | 否 | 否 |
-| 查看项目进展报告 | 是 | 是 | 是 |
-| 查看自己有权 subject 的 run trace | 是 | 是 | 是 |
-| 取消 run | run 发起人；OWNER 可取消本项目 run | run 发起人 | run 发起人 |
-| rerun | 按“新建同类 run”权限重新判断 | 同左 | 同左 |
+| 动作                              |               OWNER                |         MEMBER         |        REVIEWER        |
+| --------------------------------- | :--------------------------------: | :--------------------: | :--------------------: |
+| 查看项目内 revision               |                 是                 |           是           |           是           |
+| 比较项目内同记录 revision         |                 是                 |           是           |           是           |
+| 比较 revision 与工作副本          |                 是                 |           是           | 是，仅读取可见工作副本 |
+| 执行恢复                          |       仅自己创建的可编辑记录       | 仅自己创建的可编辑记录 |           否           |
+| 查看恢复历史                      |                 是                 |           是           |           是           |
+| 生成自己的记录总结                |                 是                 |           是           |           否           |
+| 查看项目内记录总结                |                 是                 |           是           |           是           |
+| 生成项目进展报告                  |                 是                 |           否           |           否           |
+| 查看项目进展报告                  |                 是                 |           是           |           是           |
+| 查看自己有权 subject 的 run trace |                 是                 |           是           |           是           |
+| 取消 run                          | run 发起人；OWNER 可取消本项目 run |       run 发起人       |       run 发起人       |
+| rerun                             |    按“新建同类 run”权限重新判断    |          同左          |          同左          |
 
 建议第一版只允许记录创建者生成 `RECORD_SUMMARY`，避免任意成员消耗模型额度。查看仍按项目参与者权限。
 
@@ -547,23 +544,23 @@ Replay 直接使用 run 与 steps 查询，不需要单独写接口。
 
 新增稳定错误码：
 
-| HTTP | Code | 含义 |
-|---|---|---|
-| 400 | `INVALID_DIFF_SOURCE` | source 参数非法或组合不支持 |
-| 404 | `REVISION_NOT_FOUND` | revision 不存在、非本记录或不可见 |
-| 409 | `RESTORE_NOT_ALLOWED` | 当前项目/记录状态不允许恢复 |
-| 409 | `RESTORE_PREVIEW_STALE` | preview 过期或 record version 已变化 |
-| 409 | `OPTIMISTIC_LOCK_CONFLICT` | expected version 不一致 |
-| 409 | `IDEMPOTENCY_CONFLICT` | 相同 key 被用于不同 payload |
-| 400 | `AGENT_INVALID_REQUEST` | run 请求参数非法 |
-| 409 | `AGENT_ALREADY_TERMINAL` | 对终态 run 取消等非法动作 |
-| 503 | `AGENT_DISABLED` | Agent 功能未启用 |
-| 503 | `MODEL_PROVIDER_UNAVAILABLE` | provider 不可用或未配置 |
-| 504/500 | `AGENT_TIMEOUT` | 超时 |
-| 422 | `AGENT_INVALID_OUTPUT` | 输出不符合 Schema |
-| 422 | `AGENT_EVIDENCE_INVALID` | evidence 无效、越权或无法支撑结构 |
-| 429 | `AGENT_RATE_LIMITED` | 频率或并发额度超限 |
-| 409 | `AGENT_RUN_NOT_CANCELLABLE` | 当前状态不能取消 |
+| HTTP    | Code                         | 含义                                 |
+| ------- | ---------------------------- | ------------------------------------ |
+| 400     | `INVALID_DIFF_SOURCE`        | source 参数非法或组合不支持          |
+| 404     | `REVISION_NOT_FOUND`         | revision 不存在、非本记录或不可见    |
+| 409     | `RESTORE_NOT_ALLOWED`        | 当前项目/记录状态不允许恢复          |
+| 409     | `RESTORE_PREVIEW_STALE`      | preview 过期或 record version 已变化 |
+| 409     | `OPTIMISTIC_LOCK_CONFLICT`   | expected version 不一致              |
+| 409     | `IDEMPOTENCY_CONFLICT`       | 相同 key 被用于不同 payload          |
+| 400     | `AGENT_INVALID_REQUEST`      | run 请求参数非法                     |
+| 409     | `AGENT_ALREADY_TERMINAL`     | 对终态 run 取消等非法动作            |
+| 503     | `AGENT_DISABLED`             | Agent 功能未启用                     |
+| 503     | `MODEL_PROVIDER_UNAVAILABLE` | provider 不可用或未配置              |
+| 504/500 | `AGENT_TIMEOUT`              | 超时                                 |
+| 422     | `AGENT_INVALID_OUTPUT`       | 输出不符合 Schema                    |
+| 422     | `AGENT_EVIDENCE_INVALID`     | evidence 无效、越权或无法支撑结构    |
+| 429     | `AGENT_RATE_LIMITED`         | 频率或并发额度超限                   |
+| 409     | `AGENT_RUN_NOT_CANCELLABLE`  | 当前状态不能取消                     |
 
 无权 subject 继续使用现有 404 不可见策略。
 

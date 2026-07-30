@@ -1,10 +1,11 @@
 package com.bionote.template.infrastructure.persistence;
 
+import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-import java.util.UUID;
-
-interface RecordTemplateJpaRepository extends JpaRepository<RecordTemplateEntity, UUID>, JpaSpecificationExecutor<RecordTemplateEntity> {
+interface RecordTemplateJpaRepository
+        extends JpaRepository<RecordTemplateEntity, UUID>,
+                JpaSpecificationExecutor<RecordTemplateEntity> {
     boolean existsByActiveNameKey(String activeNameKey);
 }

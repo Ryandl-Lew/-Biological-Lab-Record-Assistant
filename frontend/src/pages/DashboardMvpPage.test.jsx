@@ -4,7 +4,9 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import DashboardMvpPage from './DashboardMvpPage'
 
-vi.mock('@/store/authStore', () => ({ useAuthStore: (selector) => selector({ currentUser: { displayName: '成员 B' } }) }))
+vi.mock('@/store/authStore', () => ({
+  useAuthStore: (selector) => selector({ currentUser: { displayName: '成员 B' } }),
+}))
 
 vi.mock('@/lib/recentTracker', () => ({
   getRecent: vi.fn(() => []),
@@ -14,12 +16,33 @@ vi.mock('@/lib/recentTracker', () => ({
 
 vi.mock('@/api', () => ({
   fetchDashboardTasks: vi.fn().mockResolvedValue([
-    { id: 't1', type: 'CHANGES_REQUESTED', targetId: 'r1', title: 'PCR 记录', projectName: '演示项目', time: new Date().toISOString(), action: '继续修改', stale: false },
-    { id: 't2', type: 'PROJECT_INVITATION', targetId: 'p2', title: '加入项目「细胞培养」', projectName: '细胞培养', time: new Date().toISOString(), stale: false },
+    {
+      id: 't1',
+      type: 'CHANGES_REQUESTED',
+      targetId: 'r1',
+      title: 'PCR 记录',
+      projectName: '演示项目',
+      time: new Date().toISOString(),
+      action: '继续修改',
+      stale: false,
+    },
+    {
+      id: 't2',
+      type: 'PROJECT_INVITATION',
+      targetId: 'p2',
+      title: '加入项目「细胞培养」',
+      projectName: '细胞培养',
+      time: new Date().toISOString(),
+      stale: false,
+    },
   ]),
   fetchDashboardSummary: vi.fn().mockResolvedValue({
-    projectCount: 1, editableRecordCount: 1, changesRequestedCount: 1,
-    pendingReviewCount: 0, pendingInvitationCount: 1, unreadNotificationCount: 0,
+    projectCount: 1,
+    editableRecordCount: 1,
+    changesRequestedCount: 1,
+    pendingReviewCount: 0,
+    pendingInvitationCount: 1,
+    unreadNotificationCount: 0,
   }),
   acceptInvitation: vi.fn().mockResolvedValue({}),
   rejectInvitation: vi.fn().mockResolvedValue({}),
@@ -28,7 +51,12 @@ vi.mock('@/api', () => ({
 /** 探测：把当前路径渲染出来，验证跳转 */
 function LocationProbe() {
   const loc = useLocation()
-  return <span data-testid="location">{loc.pathname}{loc.search}</span>
+  return (
+    <span data-testid="location">
+      {loc.pathname}
+      {loc.search}
+    </span>
+  )
 }
 
 beforeEach(() => {
@@ -42,7 +70,13 @@ afterEach(() => {
 
 describe('DashboardMvpPage（欢迎页）', () => {
   it('渲染欢迎区与「开始」动作列表', async () => {
-    render(<MemoryRouter initialEntries={['/']}><Routes><Route path="/" element={<DashboardMvpPage />} /></Routes></MemoryRouter>)
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="/" element={<DashboardMvpPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
     expect(await screen.findByText('工作台')).toBeInTheDocument()
     expect(screen.getByText(/欢迎回来/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /新建实验记录/ })).toBeInTheDocument()
@@ -51,7 +85,13 @@ describe('DashboardMvpPage（欢迎页）', () => {
   })
 
   it('最近访问为空时给出友好提示', async () => {
-    render(<MemoryRouter initialEntries={['/']}><Routes><Route path="/" element={<DashboardMvpPage />} /></Routes></MemoryRouter>)
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="/" element={<DashboardMvpPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
     expect(await screen.findByText(/暂无最近访问/)).toBeInTheDocument()
   })
 
@@ -70,7 +110,13 @@ describe('DashboardMvpPage（欢迎页）', () => {
   })
 
   it('右侧渲染待处理事项及合计数', async () => {
-    render(<MemoryRouter initialEntries={['/']}><Routes><Route path="/" element={<DashboardMvpPage />} /></Routes></MemoryRouter>)
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="/" element={<DashboardMvpPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
     expect(await screen.findByText('PCR 记录')).toBeInTheDocument()
     expect(screen.getByText('加入项目「细胞培养」')).toBeInTheDocument()
     expect(screen.getByText(/2 项待处理/)).toBeInTheDocument()

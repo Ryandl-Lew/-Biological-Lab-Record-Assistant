@@ -8,6 +8,14 @@ import java.util.UUID;
 public final class NotificationDtos {
     private NotificationDtos() {}
 
-    public record View(UUID id, String type, String title, String body, Map<String, Object> target,
-                       List<String> actions, boolean stale, Instant createdAt, Instant readAt) {}
+    public record View(
+            UUID id,
+            String type,
+            String title,
+            String body,
+            Map<String, Object> target,
+            List<String> actions,
+            boolean stale,
+            Instant createdAt,
+            Instant readAt) {}
 }

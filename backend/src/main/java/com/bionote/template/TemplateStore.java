@@ -7,14 +7,26 @@ import java.util.UUID;
 
 /** Persistence port for record templates and their ordered fields. */
 public interface TemplateStore {
-    PageSlice search(UUID userId, String scope, String category, String escapedKeyword, int page, int size);
+    PageSlice search(
+            UUID userId, String scope, String category, String escapedKeyword, int page, int size);
+
     Optional<TemplateRecord> findVisible(UUID userId, UUID templateId);
+
     boolean existsByActiveNameKey(String activeNameKey);
+
     void insert(TemplateMutation template, List<FieldMutation> fields);
-    boolean update(UUID templateId, UUID ownerId, long expectedVersion, TemplateMutation template, List<FieldMutation> fields);
+
+    boolean update(
+            UUID templateId,
+            UUID ownerId,
+            long expectedVersion,
+            TemplateMutation template,
+            List<FieldMutation> fields);
+
     boolean softDelete(UUID templateId, UUID ownerId, long expectedVersion, Instant deletedAt);
 
     record PageSlice(List<TemplateRecord> items, long total) {}
+
     record TemplateRecord(
             UUID id,
             String scope,
@@ -27,8 +39,8 @@ public interface TemplateStore {
             Instant updatedAt,
             Instant deletedAt,
             long version,
-            List<FieldRecord> fields
-    ) {}
+            List<FieldRecord> fields) {}
+
     record FieldRecord(
             UUID id,
             String fieldKey,
@@ -38,8 +50,8 @@ public interface TemplateStore {
             int sortOrder,
             String placeholder,
             String defaultValueJson,
-            String optionsJson
-    ) {}
+            String optionsJson) {}
+
     record TemplateMutation(
             UUID id,
             UUID ownerId,
@@ -49,8 +61,8 @@ public interface TemplateStore {
             String experimentType,
             String category,
             String description,
-            Instant now
-    ) {}
+            Instant now) {}
+
     record FieldMutation(
             UUID id,
             String fieldKey,
@@ -60,6 +72,5 @@ public interface TemplateStore {
             int sortOrder,
             String placeholder,
             String defaultValueJson,
-            String optionsJson
-    ) {}
+            String optionsJson) {}
 }

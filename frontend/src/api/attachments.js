@@ -1,10 +1,13 @@
 import { API_BASE_URL, ApiError, request } from './client'
 
 export const fetchAttachments = (recordId) => request(`/records/${recordId}/attachments`)
-export const fetchRevisionAttachments = (revisionId) => request(`/revisions/${revisionId}/attachments`)
+export const fetchRevisionAttachments = (revisionId) =>
+  request(`/revisions/${revisionId}/attachments`)
 export const deleteAttachment = (id) => request(`/attachments/${id}`, { method: 'DELETE' })
-export const previewAttachment = (id) => request(`/attachments/${id}/preview`, { responseType: 'blob' })
-export const downloadAttachment = (id) => request(`/attachments/${id}/download`, { responseType: 'blob' })
+export const previewAttachment = (id) =>
+  request(`/attachments/${id}/preview`, { responseType: 'blob' })
+export const downloadAttachment = (id) =>
+  request(`/attachments/${id}/download`, { responseType: 'blob' })
 
 export function uploadAttachment(recordId, file, onProgress = () => {}) {
   return new Promise((resolve, reject) => {
@@ -18,13 +21,26 @@ export function uploadAttachment(recordId, file, onProgress = () => {}) {
     }
     xhr.onerror = () => reject(new ApiError('无法连接服务器，请稍后重试', 'NETWORK_ERROR', null, 0))
     xhr.onload = () => {
-      const payload = (() => { try { return JSON.parse(xhr.responseText) } catch { return null } })()
+      const payload = (() => {
+        try {
+          return JSON.parse(xhr.responseText)
+        } catch {
+          return null
+        }
+      })()
       if (xhr.status === 401) {
         localStorage.removeItem('auth_token')
         window.dispatchEvent(new Event('bionote:unauthorized'))
       }
       if (xhr.status < 200 || xhr.status >= 300) {
-        reject(new ApiError(payload?.message || '上传失败', payload?.code || 'UPLOAD_FAILED', payload?.fieldErrors, xhr.status))
+        reject(
+          new ApiError(
+            payload?.message || '上传失败',
+            payload?.code || 'UPLOAD_FAILED',
+            payload?.fieldErrors,
+            xhr.status,
+          ),
+        )
         return
       }
       onProgress(100)

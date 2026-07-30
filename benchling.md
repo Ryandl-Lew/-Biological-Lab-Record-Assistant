@@ -483,18 +483,18 @@ BioNote = 简化版 Benchling Notebook + 样品管理 + 试剂管理
 
 建议实现：
 
-| Benchling 功能 | 课程项目简化版 |
-|---|---|
-| Organization | 实验室/课题组 |
-| Project | 项目 |
-| Folder | 分类文件夹 |
-| Notebook Entry | 实验记录 |
-| Registry | 样品库/试剂库 |
-| DNA sequence editor | 可选，不建议第一版做 |
-| Molecular cloning tools | 可选，高难度 |
-| Audit trail | 简化为修改历史 |
-| Permission | 简化为个人/组内/公开 |
-| AI | 可做实验记录整理助手 |
+| Benchling 功能          | 课程项目简化版       |
+| ----------------------- | -------------------- |
+| Organization            | 实验室/课题组        |
+| Project                 | 项目                 |
+| Folder                  | 分类文件夹           |
+| Notebook Entry          | 实验记录             |
+| Registry                | 样品库/试剂库        |
+| DNA sequence editor     | 可选，不建议第一版做 |
+| Molecular cloning tools | 可选，高难度         |
+| Audit trail             | 简化为修改历史       |
+| Permission              | 简化为个人/组内/公开 |
+| AI                      | 可做实验记录整理助手 |
 
 最适合课程项目的版本是：
 

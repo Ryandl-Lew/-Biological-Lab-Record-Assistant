@@ -237,14 +237,14 @@ Diff 可以使用 query：
 
 状态文案：
 
-| 状态 | 用户文案 |
-|---|---|
-| QUEUED | 等待处理 |
-| RUNNING | 正在收集证据并生成报告 |
-| SUCCEEDED | 已生成 |
-| FAILED | 生成失败，可查看原因并重试 |
-| CANCELLED | 已取消 |
-| LIMIT_EXCEEDED | 达到运行限制，未生成报告 |
+| 状态           | 用户文案                     |
+| -------------- | ---------------------------- |
+| QUEUED         | 等待处理                     |
+| RUNNING        | 正在收集证据并生成报告       |
+| SUCCEEDED      | 已生成                       |
+| FAILED         | 生成失败，可查看原因并重试   |
+| CANCELLED      | 已取消                       |
+| LIMIT_EXCEEDED | 达到运行限制，未生成报告     |
 | INVALID_OUTPUT | 模型结果未通过结构或证据校验 |
 
 不要用前端 setTimeout 伪造步骤进度。

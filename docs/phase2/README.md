@@ -30,18 +30,18 @@
 
 ## 2. 文档与批次
 
-| 顺序 | 文档 | 主要交付 | 建议负责人 |
-|---|---|---|---|
-| 0 | `00-phase2-master-contract.md` | 总范围、架构、非目标、工作纪律 | 全员阅读 |
-| 0 | `01-phase2-domain-api-contract.md` | 统一模型、权限、状态、API、错误码、迁移编号 | 全员阅读 |
-| 1 | `02-foundation-state-events.md` | 状态策略、类型化领域事件、审计适配层 | 集成/后端负责人 |
-| 2A | `03-revision-diff.md` | 修订摘要、详情、规范化与领域感知 Diff | 版本模块负责人 |
-| 2B | `04-restore-preview-execution.md` | 恢复预览、事务恢复、幂等和恢复审计 | 恢复模块负责人 |
-| 2C | `05-agent-harness-runtime.md` | Agent SPI、运行循环、工具注册、trace、prompt 版本 | Agent Runtime 负责人 |
-| 3 | `06-agent-tools-progress-reports.md` | 只读工具、记录总结、项目进展报告、证据校验 | Agent 业务负责人 |
-| 4 | `07-frontend-version-agent-experience.md` | 版本比较/恢复 UI、Agent 报告 UI、运行轨迹 | 前端负责人 |
-| 5 | `08-integration-quality-demo.md` | 全量测试、安全、性能、演示、交付门禁 | 集成负责人 |
-| 协作 | `09-team-ownership-merge-plan.md` | 文件归属、依赖图、合并顺序、冲突处理 | 项目负责人 |
+| 顺序 | 文档                                      | 主要交付                                          | 建议负责人           |
+| ---- | ----------------------------------------- | ------------------------------------------------- | -------------------- |
+| 0    | `00-phase2-master-contract.md`            | 总范围、架构、非目标、工作纪律                    | 全员阅读             |
+| 0    | `01-phase2-domain-api-contract.md`        | 统一模型、权限、状态、API、错误码、迁移编号       | 全员阅读             |
+| 1    | `02-foundation-state-events.md`           | 状态策略、类型化领域事件、审计适配层              | 集成/后端负责人      |
+| 2A   | `03-revision-diff.md`                     | 修订摘要、详情、规范化与领域感知 Diff             | 版本模块负责人       |
+| 2B   | `04-restore-preview-execution.md`         | 恢复预览、事务恢复、幂等和恢复审计                | 恢复模块负责人       |
+| 2C   | `05-agent-harness-runtime.md`             | Agent SPI、运行循环、工具注册、trace、prompt 版本 | Agent Runtime 负责人 |
+| 3    | `06-agent-tools-progress-reports.md`      | 只读工具、记录总结、项目进展报告、证据校验        | Agent 业务负责人     |
+| 4    | `07-frontend-version-agent-experience.md` | 版本比较/恢复 UI、Agent 报告 UI、运行轨迹         | 前端负责人           |
+| 5    | `08-integration-quality-demo.md`          | 全量测试、安全、性能、演示、交付门禁              | 集成负责人           |
+| 协作 | `09-team-ownership-merge-plan.md`         | 文件归属、依赖图、合并顺序、冲突处理              | 项目负责人           |
 
 批次 2A、2B、2C 只有在批次 1 的接口和基线代码合并后才可并行。批次 2B 可以先依据 `01-phase2-domain-api-contract.md` 编写测试和服务骨架，但最终必须复用 2A 的 Diff 结果模型，不能自行建立第二套差异计算。
 

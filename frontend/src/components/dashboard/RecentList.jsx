@@ -37,7 +37,11 @@ export default function RecentList() {
       <div className="mb-2 flex items-center justify-between px-1">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">最近</h2>
         {items.length > 0 && (
-          <button type="button" onClick={handleClear} className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-700">
+          <button
+            type="button"
+            onClick={handleClear}
+            className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-700"
+          >
             <Eraser size={13} />
             <span>清除</span>
           </button>
@@ -60,7 +64,8 @@ export default function RecentList() {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm text-slate-700">{item.title}</span>
                     <span className="block truncate text-xs text-slate-400">
-                      {item.subTitle ? `${item.subTitle} · ` : ''}{formatRelativeTime(item.visitedAt)}
+                      {item.subTitle ? `${item.subTitle} · ` : ''}
+                      {formatRelativeTime(item.visitedAt)}
                     </span>
                   </span>
                 </button>

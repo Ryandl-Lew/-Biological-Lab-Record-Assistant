@@ -5,5 +5,6 @@ import java.util.UUID;
 
 public interface DashboardQueryStore {
     List<DashboardDtos.Task> tasks(UUID userId);
+
     DashboardDtos.Summary summary(UUID userId);
 }

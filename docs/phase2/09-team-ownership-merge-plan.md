@@ -91,27 +91,27 @@ P2-1 Foundation State/Events
 
 ## 4. 文件归属矩阵
 
-| 路径 | 唯一所有者 | 其他成员规则 |
-|---|---|---|
-| `backend/.../domain/record/**` | 基础负责人 | 只调用，不修改 |
-| `backend/.../collaboration/event/**` | 基础负责人 | 只新增已批准 event handler |
-| `backend/.../revision/**` | 版本负责人 | Restore/Agent 只依赖公开接口 |
-| `V9__...` | 版本负责人 | 禁止修改 |
-| `backend/.../restore/**` | 恢复负责人 | 其他模块不修改 |
-| `V10__...` | 恢复负责人 | 禁止修改 |
-| `backend/.../agent/runtime|model|prompt|trace/**` | Runtime 负责人 | 业务负责人使用扩展接口 |
-| `backend/.../agent/tool/bionote|report|api/**` | Agent 业务负责人 | Runtime 负责人不写业务工具 |
-| `V11__...` | Runtime 负责人 | 禁止修改 |
-| `V12__...` | 集成负责人 | 只在最终查询验证后提交 |
-| `RecordDetailMvpPage.jsx` | Record 前端负责人 | 其他人只提供组件/API |
-| `ProjectDetailMvpPage.jsx` | Project 前端负责人 | 其他人只提供组件/API |
-| `frontend/src/api/index.js` | 集成负责人 | 分支不同时编辑；在报告列出待导出项 |
-| `frontend/src/domain/enums.js` | 集成负责人 | 状态常量放模块文件，最后汇总 |
-| `frontend/src/router/index.jsx` | 集成负责人 | 非必要不新增路由 |
-| `Sidebar.jsx` | 集成负责人 | 不增加 AI 顶级入口 |
-| `backend/pom.xml` | Runtime/集成负责人 | 其他成员先提依赖需求 |
-| `application*.yml` | Runtime/集成负责人 | 其他成员不重排配置 |
-| README | 集成负责人 | 各模块提供片段/完成报告 |
+| 路径                                 | 唯一所有者         | 其他成员规则                       |
+| ------------------------------------ | ------------------ | ---------------------------------- |
+| `backend/.../domain/record/**`       | 基础负责人         | 只调用，不修改                     |
+| `backend/.../collaboration/event/**` | 基础负责人         | 只新增已批准 event handler         |
+| `backend/.../revision/**`            | 版本负责人         | Restore/Agent 只依赖公开接口       |
+| `V9__...`                            | 版本负责人         | 禁止修改                           |
+| `backend/.../restore/**`             | 恢复负责人         | 其他模块不修改                     |
+| `V10__...`                           | 恢复负责人         | 禁止修改                           |
+| `backend/.../agent/runtime           | model              | prompt                             | trace/**`        | Runtime 负责人             | 业务负责人使用扩展接口 |
+| `backend/.../agent/tool/bionote      | report             | api/**`                            | Agent 业务负责人 | Runtime 负责人不写业务工具 |
+| `V11__...`                           | Runtime 负责人     | 禁止修改                           |
+| `V12__...`                           | 集成负责人         | 只在最终查询验证后提交             |
+| `RecordDetailMvpPage.jsx`            | Record 前端负责人  | 其他人只提供组件/API               |
+| `ProjectDetailMvpPage.jsx`           | Project 前端负责人 | 其他人只提供组件/API               |
+| `frontend/src/api/index.js`          | 集成负责人         | 分支不同时编辑；在报告列出待导出项 |
+| `frontend/src/domain/enums.js`       | 集成负责人         | 状态常量放模块文件，最后汇总       |
+| `frontend/src/router/index.jsx`      | 集成负责人         | 非必要不新增路由                   |
+| `Sidebar.jsx`                        | 集成负责人         | 不增加 AI 顶级入口                 |
+| `backend/pom.xml`                    | Runtime/集成负责人 | 其他成员先提依赖需求               |
+| `application*.yml`                   | Runtime/集成负责人 | 其他成员不重排配置                 |
+| README                               | 集成负责人         | 各模块提供片段/完成报告            |
 
 ## 5. Contract-first 交付物
 

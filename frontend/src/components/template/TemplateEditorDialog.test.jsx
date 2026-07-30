@@ -5,7 +5,8 @@ import TemplateEditorDialog from './TemplateEditorDialog'
 
 describe('TemplateEditorDialog', () => {
   it('validates select options and supports ordered fields', async () => {
-    const user = userEvent.setup(), save = vi.fn()
+    const user = userEvent.setup(),
+      save = vi.fn()
     render(<TemplateEditorDialog template={null} onClose={vi.fn()} onSave={save} />)
     await user.type(screen.getByText('模板名称').nextElementSibling, '模板')
     await user.type(screen.getByLabelText('字段 1 名称'), '结果')

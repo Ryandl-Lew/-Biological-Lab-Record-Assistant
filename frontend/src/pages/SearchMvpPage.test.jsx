@@ -11,24 +11,60 @@ vi.mock('@/api', () => ({
   fetchProjectMembers: vi.fn().mockResolvedValue([]),
 }))
 
-function Location() { const location = useLocation(); return <span data-testid="location">{location.pathname}{location.search}{location.hash}</span> }
+function Location() {
+  const location = useLocation()
+  return (
+    <span data-testid="location">
+      {location.pathname}
+      {location.search}
+      {location.hash}
+    </span>
+  )
+}
 
 describe('SearchMvpPage', () => {
   it('keeps filters in the URL, debounces keyword changes, paginates and follows an exact target', async () => {
     const user = userEvent.setup()
     search.mockResolvedValue({
-      items: [{ entityType: 'ATTACHMENT', id: 'a1', title: '结果图.png', snippet: '图片附件', projectName: '项目', target: { type: 'RECORD_ATTACHMENT', id: 'r1', attachmentId: 'a1' } }],
+      items: [
+        {
+          entityType: 'ATTACHMENT',
+          id: 'a1',
+          title: '结果图.png',
+          snippet: '图片附件',
+          projectName: '项目',
+          target: { type: 'RECORD_ATTACHMENT', id: 'r1', attachmentId: 'a1' },
+        },
+      ],
       meta: { page: 0, size: 20, total: 21, counts: { ATTACHMENT: 21 } },
     })
-    render(<MemoryRouter initialEntries={['/search?entityType=ATTACHMENT']}><Routes><Route path="*" element={<><SearchMvpPage /><Location /></>} /></Routes></MemoryRouter>)
+    render(
+      <MemoryRouter initialEntries={['/search?entityType=ATTACHMENT']}>
+        <Routes>
+          <Route
+            path="*"
+            element={
+              <>
+                <SearchMvpPage />
+                <Location />
+              </>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
     expect(await screen.findByText('结果图.png')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '全部' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '项目' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '实验记录' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /全部\s+21/ })).not.toBeInTheDocument()
     expect(search).toHaveBeenCalledWith(expect.objectContaining({ entityType: 'ATTACHMENT' }))
-    fireEvent.change(screen.getByRole('searchbox', { name: '全局搜索' }), { target: { value: 'PCR' } })
-    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('keyword=PCR'), { timeout: 1000 })
+    fireEvent.change(screen.getByRole('searchbox', { name: '全局搜索' }), {
+      target: { value: 'PCR' },
+    })
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('keyword=PCR'), {
+      timeout: 1000,
+    })
     expect(search).toHaveBeenCalledWith(expect.objectContaining({ keyword: 'PCR' }))
     await user.click(screen.getByRole('button', { name: /下一页/ }))
     expect(screen.getByTestId('location')).toHaveTextContent('page=1')

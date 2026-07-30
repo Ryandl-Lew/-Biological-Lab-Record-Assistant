@@ -4,7 +4,11 @@ export const API_BASE = process.env.E2E_API_BASE || 'http://127.0.0.1:8080/api/v
 export const PASSWORD = 'E2eDemo123!'
 
 export function unique(prefix) {
-  const safePrefix = String(prefix).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'user'
+  const safePrefix =
+    String(prefix)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'user'
   return `${safePrefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
@@ -35,11 +39,20 @@ export async function loginUi(page, account) {
 }
 
 export async function createProjectApi(request, owner, name = unique('project')) {
-  return apiCall(request, 'POST', '/projects', owner.token, { name, description: 'Playwright 独立测试项目' })
+  return apiCall(request, 'POST', '/projects', owner.token, {
+    name,
+    description: 'Playwright 独立测试项目',
+  })
 }
 
 export async function inviteAndAcceptApi(request, owner, projectId, invitee) {
-  const invitation = await apiCall(request, 'POST', `/projects/${projectId}/invitations`, owner.token, { email: invitee.email })
+  const invitation = await apiCall(
+    request,
+    'POST',
+    `/projects/${projectId}/invitations`,
+    owner.token,
+    { email: invitee.email },
+  )
   await apiCall(request, 'POST', `/invitations/${invitation.id}/accept`, invitee.token)
 }
 

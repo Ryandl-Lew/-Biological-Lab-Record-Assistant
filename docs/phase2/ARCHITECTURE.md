@@ -106,16 +106,16 @@ sequenceDiagram
 
 ## 权限矩阵
 
-| 能力 | 记录创建者 | 项目 OWNER | REVIEWER | MEMBER | outsider |
-|---|---:|---:|---:|---:|---:|
-| 查看同项目 Revision/Diff | 是 | 是 | 是 | 是 | 否 |
-| Restore 可编辑记录 | 自己创建 | 仅自己创建 | 仅自己创建 | 仅自己创建 | 否 |
-| Restore 完成记录/归档项目 | 否 | 否 | 否 | 否 | 否 |
-| 创建 Record Summary | 自己创建 | 仅自己创建 | 仅自己创建 | 仅自己创建 | 否 |
-| 创建 Project Progress | 若为 OWNER | 是 | 否 | 否 | 否 |
-| 查看项目 Artifact | 是 | 是 | 是 | 是 | 否 |
-| 查看 Trace | 请求者 | 是 | 仅自己的 Run | 仅自己的 Run | 否 |
-| cancel/rerun | 请求者；rerun 重验权限 | OWNER 可 cancel | 按创建权限 | 按创建权限 | 否 |
+| 能力                      |             记录创建者 |      项目 OWNER |     REVIEWER |       MEMBER | outsider |
+| ------------------------- | ---------------------: | --------------: | -----------: | -----------: | -------: |
+| 查看同项目 Revision/Diff  |                     是 |              是 |           是 |           是 |       否 |
+| Restore 可编辑记录        |               自己创建 |      仅自己创建 |   仅自己创建 |   仅自己创建 |       否 |
+| Restore 完成记录/归档项目 |                     否 |              否 |           否 |           否 |       否 |
+| 创建 Record Summary       |               自己创建 |      仅自己创建 |   仅自己创建 |   仅自己创建 |       否 |
+| 创建 Project Progress     |             若为 OWNER |              是 |           否 |           否 |       否 |
+| 查看项目 Artifact         |                     是 |              是 |           是 |           是 |       否 |
+| 查看 Trace                |                 请求者 |              是 | 仅自己的 Run | 仅自己的 Run |       否 |
+| cancel/rerun              | 请求者；rerun 重验权限 | OWNER 可 cancel |   按创建权限 |   按创建权限 |       否 |
 
 所有写操作和工具调用均在执行时重新授权；创建 Run 后失权会失败且不保存 Artifact。
 

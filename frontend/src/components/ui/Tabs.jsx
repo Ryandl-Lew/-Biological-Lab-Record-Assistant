@@ -20,9 +20,7 @@ export default function Tabs({ items, activeKey, onChange }) {
             type="button"
             onClick={() => onChange(item.key)}
             className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all ${
-              active
-                ? 'bg-white text-slate-900 shadow-card'
-                : 'text-slate-500 hover:text-slate-900'
+              active ? 'bg-white text-slate-900 shadow-card' : 'text-slate-500 hover:text-slate-900'
             }`}
           >
             {item.label}

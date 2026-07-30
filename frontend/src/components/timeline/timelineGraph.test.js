@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { buildTimelineGraph, graphNodeLabel, graphNodeContext } from './timelineGraph'
 
 function ev(id, type, createdAt, overrides = {}) {
-  return { id, eventType: type, actorId: overrides.actorId || 'u1', actorName: '张三', metadata: overrides.metadata || {}, recordId: overrides.recordId || null, createdAt }
+  return {
+    id,
+    eventType: type,
+    actorId: overrides.actorId || 'u1',
+    actorName: '张三',
+    metadata: overrides.metadata || {},
+    recordId: overrides.recordId || null,
+    createdAt,
+  }
 }
 
 describe('buildTimelineGraph', () => {
@@ -176,19 +184,23 @@ describe('graphNodeLabel', () => {
   })
 
   it('returns aggregated label for multiple uploads', () => {
-    const node = { events: [
-      { eventType: 'ATTACHMENT_UPLOADED', actorId: 'u1' },
-      { eventType: 'ATTACHMENT_UPLOADED', actorId: 'u1' },
-      { eventType: 'ATTACHMENT_UPLOADED', actorId: 'u1' },
-    ]}
+    const node = {
+      events: [
+        { eventType: 'ATTACHMENT_UPLOADED', actorId: 'u1' },
+        { eventType: 'ATTACHMENT_UPLOADED', actorId: 'u1' },
+        { eventType: 'ATTACHMENT_UPLOADED', actorId: 'u1' },
+      ],
+    }
     expect(graphNodeLabel(node, labels)).toBe('上传了 3 个附件')
   })
 
   it('returns aggregated label for export previews', () => {
-    const node = { events: [
-      { eventType: 'RECORD_EXPORT_PREVIEW', actorId: 'u1' },
-      { eventType: 'RECORD_EXPORT_PREVIEW', actorId: 'u1' },
-    ]}
+    const node = {
+      events: [
+        { eventType: 'RECORD_EXPORT_PREVIEW', actorId: 'u1' },
+        { eventType: 'RECORD_EXPORT_PREVIEW', actorId: 'u1' },
+      ],
+    }
     expect(graphNodeLabel(node, {})).toBe('预览了 2 次报告')
   })
 })

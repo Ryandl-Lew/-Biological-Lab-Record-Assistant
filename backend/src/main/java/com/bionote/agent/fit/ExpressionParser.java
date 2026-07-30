@@ -1,23 +1,22 @@
 package com.bionote.agent.fit;
 
 import com.bionote.common.ApiException;
-import org.springframework.http.HttpStatus;
-
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
+import org.springframework.http.HttpStatus;
 
 /**
- * Parses RHS of equations like {@code y = a + b*x} or {@code a*exp(-k*x)+b}.
- * Supports + - * / ^, parentheses, and functions exp/log/ln/sqrt/sin/cos.
+ * Parses RHS of equations like {@code y = a + b*x} or {@code a*exp(-k*x)+b}. Supports + - * / ^,
+ * parentheses, and functions exp/log/ln/sqrt/sin/cos.
  */
 public final class ExpressionParser {
     private ExpressionParser() {}
 
-    public record CompiledEquation(String equation, String rhs, List<String> parameters, Expr root) {
+    public record CompiledEquation(
+            String equation, String rhs, List<String> parameters, Expr root) {
         public double value(double x, double[] params) {
             return root.eval(x, params);
         }
@@ -36,19 +35,23 @@ public final class ExpressionParser {
             rhs = text;
         }
         if (rhs.isBlank() || rhs.length() > 200) throw invalid("equation RHS is invalid");
-        if (!rhs.matches("[0-9a-zA-Z_+\\-*/^().,\\s]+")) throw invalid("equation contains unsupported characters");
+        if (!rhs.matches("[0-9a-zA-Z_+\\-*/^().,\\s]+"))
+            throw invalid("equation contains unsupported characters");
         Parser parser = new Parser(rhs);
         Expr root = parser.parseExpression();
         parser.expectEnd();
         List<String> parameters = new ArrayList<>(parser.parameters);
         if (parameters.size() > 6) throw invalid("equation allows at most 6 parameters");
-        if (parameters.isEmpty()) throw invalid("equation must contain at least one free parameter");
+        if (parameters.isEmpty())
+            throw invalid("equation must contain at least one free parameter");
         String normalized = "y = " + rhs.replaceAll("\\s+", "");
         return new CompiledEquation(normalized, rhs, parameters, root);
     }
 
     private static ApiException invalid(String message) {
-        return new ApiException(HttpStatus.BAD_REQUEST, "FIT_INVALID_EQUATION",
+        return new ApiException(
+                HttpStatus.BAD_REQUEST,
+                "FIT_INVALID_EQUATION",
                 "方程无效：" + message + "。请使用预置方程（如 y=a+b*x），或改用「多元线性回归」并对多列自变量分别指定列名。");
     }
 
@@ -62,7 +65,9 @@ public final class ExpressionParser {
         private final LinkedHashSet<String> parameters = new LinkedHashSet<>();
         private static final Set<String> FUNCS = Set.of("exp", "log", "ln", "sqrt", "sin", "cos");
 
-        Parser(String input) { this.input = input; }
+        Parser(String input) {
+            this.input = input;
+        }
 
         Expr parseExpression() {
             Expr left = parseTerm();

@@ -7,8 +7,24 @@ import { fetchProjects, fetchTemplates } from '@/api'
 vi.mock('@/api', () => ({
   fetchProjects: vi.fn().mockResolvedValue({
     items: [
-      { id: 'p1', name: '当前项目', description: '', status: 'ACTIVE', memberCount: 2, recordCount: 1, capabilities: { canCreateRecord: true } },
-      { id: 'p2', name: '其他项目', description: '', status: 'ACTIVE', memberCount: 1, recordCount: 0, capabilities: { canCreateRecord: true } },
+      {
+        id: 'p1',
+        name: '当前项目',
+        description: '',
+        status: 'ACTIVE',
+        memberCount: 2,
+        recordCount: 1,
+        capabilities: { canCreateRecord: true },
+      },
+      {
+        id: 'p2',
+        name: '其他项目',
+        description: '',
+        status: 'ACTIVE',
+        memberCount: 1,
+        recordCount: 0,
+        capabilities: { canCreateRecord: true },
+      },
     ],
   }),
   fetchTemplates: vi.fn().mockResolvedValue({ items: [] }),

@@ -4,9 +4,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Persistence boundary used only by the development data seeders.
- */
+/** Persistence boundary used only by the development data seeders. */
 public interface DemoDataStore {
     Optional<UUID> findProjectIdByName(String name);
 
@@ -20,7 +18,8 @@ public interface DemoDataStore {
 
     boolean activeAttachmentExists(UUID recordId, String originalFilename);
 
-    void alignRecordTimes(UUID recordId, Instant createdAt, Instant updatedAt, Instant attachmentCreatedAt);
+    void alignRecordTimes(
+            UUID recordId, Instant createdAt, Instant updatedAt, Instant attachmentCreatedAt);
 
     void spreadProjectTimeline(UUID projectId, Instant start, long stepHours);
 }

@@ -21,7 +21,11 @@ export async function request(path, options = {}) {
   const token = localStorage.getItem('auth_token')
   const headers = new Headers(fetchOptions.headers)
   headers.set('Accept', responseType === 'blob' ? '*/*' : 'application/json')
-  if (fetchOptions.body && !(fetchOptions.body instanceof FormData) && !headers.has('Content-Type')) {
+  if (
+    fetchOptions.body &&
+    !(fetchOptions.body instanceof FormData) &&
+    !headers.has('Content-Type')
+  ) {
     headers.set('Content-Type', 'application/json')
   }
   if (token) {
@@ -35,9 +39,12 @@ export async function request(path, options = {}) {
     throw new ApiError('无法连接服务器，请稍后重试', 'NETWORK_ERROR', null, 0)
   }
 
-  const payload = response.status === 204 ? null : responseType === 'blob'
-    ? await response.blob()
-    : await response.json().catch(() => null)
+  const payload =
+    response.status === 204
+      ? null
+      : responseType === 'blob'
+        ? await response.blob()
+        : await response.json().catch(() => null)
   if (!response.ok) {
     if (response.status === 401) {
       localStorage.removeItem('auth_token')

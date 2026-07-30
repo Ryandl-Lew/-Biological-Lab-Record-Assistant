@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.git/
+playwright-report*/
+test-results*/
+target/
+build/
+*.min.js
+*.min.css
+package-lock.json
+*.lock

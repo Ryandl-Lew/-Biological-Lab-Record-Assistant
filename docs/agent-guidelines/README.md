@@ -17,16 +17,16 @@
 
 ## 执行顺序
 
-| 顺序 | 指南 | 交付结果 |
-|---|---|---|
-| 0 | `00-master-contract.md` | 全局范围、架构、参考边界和工作纪律 |
-| 0 | `01-domain-api-contract.md` | 统一领域模型、状态机、权限和 API 契约 |
-| 1 | `02-foundation-auth-profile.md` | 后端骨架、数据库、认证、注册登录、个人资料 |
-| 2 | `03-project-team-invitation.md` | 项目、成员、邀请、角色变更、归档基础能力 |
-| 3 | `04-template-record-authoring.md` | 系统/个人模板、记录创建、富文本编辑、软删除 |
-| 4 | `05-review-attachment-export.md` | 提交快照、审核闭环、附件上传预览、PDF/Markdown 导出 |
-| 5 | `06-notification-search-audit-dashboard.md` | 通知、待办、搜索、审计时间线与页面整合 |
-| 6 | `07-integration-quality-demo.md` | 全量清理、权限/并发测试、E2E、演示数据和交付文档 |
+| 顺序 | 指南                                        | 交付结果                                            |
+| ---- | ------------------------------------------- | --------------------------------------------------- |
+| 0    | `00-master-contract.md`                     | 全局范围、架构、参考边界和工作纪律                  |
+| 0    | `01-domain-api-contract.md`                 | 统一领域模型、状态机、权限和 API 契约               |
+| 1    | `02-foundation-auth-profile.md`             | 后端骨架、数据库、认证、注册登录、个人资料          |
+| 2    | `03-project-team-invitation.md`             | 项目、成员、邀请、角色变更、归档基础能力            |
+| 3    | `04-template-record-authoring.md`           | 系统/个人模板、记录创建、富文本编辑、软删除         |
+| 4    | `05-review-attachment-export.md`            | 提交快照、审核闭环、附件上传预览、PDF/Markdown 导出 |
+| 5    | `06-notification-search-audit-dashboard.md` | 通知、待办、搜索、审计时间线与页面整合              |
+| 6    | `07-integration-quality-demo.md`            | 全量清理、权限/并发测试、E2E、演示数据和交付文档    |
 
 批次必须串行执行。上一批次的验收命令和人工验收项未通过，不得开始下一批次。
 
@@ -59,4 +59,3 @@ docs/agent-guidelines/XX-*.md 对应批次。
 9. 全局搜索仅返回当前用户有权访问的内容，并支持筛选和分页。
 10. A 仅在所有有效记录完成后才能归档项目；归档后项目只读且不可恢复。
 11. 关键操作生成通知和不可修改的审计事件。
-

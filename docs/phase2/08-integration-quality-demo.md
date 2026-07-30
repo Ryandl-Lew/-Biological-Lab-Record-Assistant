@@ -63,18 +63,18 @@ V12 不允许新增产品表或改变领域语义。
 
 ## 4. 后端回归矩阵
 
-| 能力 | 成功路径 | 失败/边界 |
-|---|---|---|
-| Revision list | 分页、摘要、详情 | outsider、跨 record、软删除 |
-| Diff | R1/R2、revision/working copy | source 非法、跨 record、超大截断 |
-| Restore preview | Diff、附件计划、token | 非 creator、状态、归档、过期 version |
-| Restore execute | 事务写入、R3、audit | 双击、不同 payload、并发、回滚 |
-| Prompt | v1 注册、run 引用 | 同版本 hash 改变 |
-| Worker | queue、claim、终态 | 多 worker、重启、中断、取消 |
-| Tool | 白名单读取、分页 | 跨项目、非法 args、过量结果 |
-| Artifact | Schema、evidence | 幻觉 ID、无 evidence、非法建议 |
-| Trace | step、耗时、hash | secret、正文、隐藏推理泄露 |
-| Run API | 202、查询、rerun | disabled、rate limit、失权、终态取消 |
+| 能力            | 成功路径                     | 失败/边界                            |
+| --------------- | ---------------------------- | ------------------------------------ |
+| Revision list   | 分页、摘要、详情             | outsider、跨 record、软删除          |
+| Diff            | R1/R2、revision/working copy | source 非法、跨 record、超大截断     |
+| Restore preview | Diff、附件计划、token        | 非 creator、状态、归档、过期 version |
+| Restore execute | 事务写入、R3、audit          | 双击、不同 payload、并发、回滚       |
+| Prompt          | v1 注册、run 引用            | 同版本 hash 改变                     |
+| Worker          | queue、claim、终态           | 多 worker、重启、中断、取消          |
+| Tool            | 白名单读取、分页             | 跨项目、非法 args、过量结果          |
+| Artifact        | Schema、evidence             | 幻觉 ID、无 evidence、非法建议       |
+| Trace           | step、耗时、hash             | secret、正文、隐藏推理泄露           |
+| Run API         | 202、查询、rerun             | disabled、rate limit、失权、终态取消 |
 
 每一行至少有后端自动化测试；恢复、权限、worker 竞争和证据验证必须是集成测试。
 

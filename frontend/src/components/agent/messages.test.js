@@ -9,21 +9,26 @@ describe('agentErrorMessage', () => {
   })
 
   it('surfaces validation field errors', () => {
-    expect(agentErrorMessage({
-      code: 'VALIDATION_ERROR',
-      message: '请检查输入内容',
-      fieldErrors: { 'history[1].content': '长度需要在0和4000之间' },
-    })).toContain('长度需要在0和4000之间')
+    expect(
+      agentErrorMessage({
+        code: 'VALIDATION_ERROR',
+        message: '请检查输入内容',
+        fieldErrors: { 'history[1].content': '长度需要在0和4000之间' },
+      }),
+    ).toContain('长度需要在0和4000之间')
   })
 })
 
 describe('trimChatHistory', () => {
   it('keeps recent turns and truncates long content', () => {
-    const history = trimChatHistory([
-      { role: 'user', content: 'a'.repeat(10) },
-      { role: 'assistant', content: 'b'.repeat(5000) },
-      { role: 'user', content: 'x轴是发酵时长，y轴是耗碱量（显示值）' },
-    ], { maxItems: 2, maxChars: 100 })
+    const history = trimChatHistory(
+      [
+        { role: 'user', content: 'a'.repeat(10) },
+        { role: 'assistant', content: 'b'.repeat(5000) },
+        { role: 'user', content: 'x轴是发酵时长，y轴是耗碱量（显示值）' },
+      ],
+      { maxItems: 2, maxChars: 100 },
+    )
     expect(history).toHaveLength(2)
     expect(history[0].content).toHaveLength(100)
     expect(history[1].content).toContain('发酵时长')

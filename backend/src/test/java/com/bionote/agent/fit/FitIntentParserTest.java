@@ -1,17 +1,17 @@
 package com.bionote.agent.fit;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class FitIntentParserTest {
     private final FitIntentParser parser = new FitIntentParser(new ObjectMapper());
 
     @Test
     void parsesChineseFitRequestWithoutStealingYEquals() {
-        FitModels.FitIntent intent = parser.parse(
-                "拟合 方程：y = a + b*x ；xField=concentration ；yField=ct ；状态 COMPLETED");
+        FitModels.FitIntent intent =
+                parser.parse("拟合 方程：y = a + b*x ；xField=concentration ；yField=ct ；状态 COMPLETED");
         assertThat(intent.fitRequested()).isTrue();
         assertThat(intent.equation()).containsIgnoringCase("y");
         assertThat(intent.equation()).contains("a + b*x");
@@ -30,7 +30,9 @@ class FitIntentParserTest {
 
     @Test
     void parsesJsonBlock() {
-        FitModels.FitIntent intent = parser.parse("""
+        FitModels.FitIntent intent =
+                parser.parse(
+                        """
                 帮我算一下 {"equation":"y=a+b*x","xField":"x","yField":"y","recordCodes":["EXP-20260727-ABC"],"statuses":["COMPLETED"]}
                 """);
         assertThat(intent.fitRequested()).isTrue();

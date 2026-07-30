@@ -3,12 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import TopbarMvp from './TopbarMvp'
-import {
-  acceptInvitation,
-  fetchNotifications,
-  fetchUnreadCount,
-  markNotificationRead,
-} from '@/api'
+import { acceptInvitation, fetchNotifications, fetchUnreadCount, markNotificationRead } from '@/api'
 
 vi.mock('@/api', () => ({
   acceptInvitation: vi.fn().mockResolvedValue({}),
@@ -39,7 +34,11 @@ describe('TopbarMvp', () => {
     fetchNotifications.mockResolvedValue({ items: [], meta: { totalPages: 0 } })
     const intervalSpy = vi.spyOn(window, 'setInterval').mockReturnValue(77)
     const clearSpy = vi.spyOn(window, 'clearInterval').mockImplementation(() => {})
-    const { unmount } = render(<MemoryRouter><TopbarMvp /></MemoryRouter>)
+    const { unmount } = render(
+      <MemoryRouter>
+        <TopbarMvp />
+      </MemoryRouter>,
+    )
     expect(await screen.findByRole('button', { name: '通知，2 条未读' })).toBeInTheDocument()
     expect(intervalSpy).toHaveBeenCalledWith(expect.any(Function), 20_000)
     fireEvent.focus(window)
@@ -51,8 +50,17 @@ describe('TopbarMvp', () => {
   it('uses controlled invitation actions and marks the notification read', async () => {
     const user = userEvent.setup()
     fetchUnreadCount.mockResolvedValue({ count: 1 })
-    fetchNotifications.mockResolvedValueOnce({ items: [invitation], meta: { totalPages: 1 } }).mockResolvedValue({ items: [{ ...invitation, stale: true, actions: [] }], meta: { totalPages: 1 } })
-    render(<MemoryRouter><TopbarMvp /></MemoryRouter>)
+    fetchNotifications
+      .mockResolvedValueOnce({ items: [invitation], meta: { totalPages: 1 } })
+      .mockResolvedValue({
+        items: [{ ...invitation, stale: true, actions: [] }],
+        meta: { totalPages: 1 },
+      })
+    render(
+      <MemoryRouter>
+        <TopbarMvp />
+      </MemoryRouter>,
+    )
     await user.click(await screen.findByRole('button', { name: '通知，1 条未读' }))
     await user.click(await screen.findByRole('button', { name: '接受' }))
     await waitFor(() => expect(acceptInvitation).toHaveBeenCalledWith('i1'))

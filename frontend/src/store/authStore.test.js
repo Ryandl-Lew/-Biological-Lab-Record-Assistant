@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { useAuthStore } from './authStore'
 
 describe('authStore session handling', () => {
-  beforeEach(() => { localStorage.clear(); useAuthStore.setState({ currentUser: { id: 'x' }, token: 'old', loading: false }) })
+  beforeEach(() => {
+    localStorage.clear()
+    useAuthStore.setState({ currentUser: { id: 'x' }, token: 'old', loading: false })
+  })
   it('clears token and user after a 401 event', () => {
     localStorage.setItem('auth_token', 'old')
     const clear = useAuthStore.getState().clearSession

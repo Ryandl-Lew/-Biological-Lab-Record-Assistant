@@ -106,6 +106,6 @@ export default function AgentHelpDialog({ open, onClose }) {
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   )
 }

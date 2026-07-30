@@ -1,11 +1,6 @@
 package com.bionote.agent.config;
 
 import com.bionote.common.ApiException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -15,10 +10,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
 
 /**
- * Resolves the single shared LLM configuration from the repository-local {@code llm} file.
- * Values are read on demand so updating the file does not require persisting credentials elsewhere.
+ * Resolves the single shared LLM configuration from the repository-local {@code llm} file. Values
+ * are read on demand so updating the file does not require persisting credentials elsewhere.
  */
 @Service
 public class AgentCredentialService {
@@ -26,8 +25,9 @@ public class AgentCredentialService {
     private final String configuredPath;
 
     @Autowired
-    public AgentCredentialService(AgentProperties properties,
-                                  @Value("${bionote.llm-config-path:}") String configuredPath) {
+    public AgentCredentialService(
+            AgentProperties properties,
+            @Value("${bionote.llm-config-path:}") String configuredPath) {
         this.properties = properties;
         this.configuredPath = configuredPath == null ? "" : configuredPath.trim();
     }
@@ -42,8 +42,7 @@ public class AgentCredentialService {
                     "fake",
                     blank(properties.getModel()) ? "fake-deterministic-v1" : properties.getModel(),
                     "",
-                    ""
-            );
+                    "");
         }
         return readLlmFile(resolvePath());
     }
@@ -73,20 +72,19 @@ public class AgentCredentialService {
             throw unavailable("llm 配置文件必须包含 base_url (OpenAI)、api_key 和 model");
         }
         if (!baseUrl.endsWith("/")) baseUrl += "/";
-        return new AgentCredentials(
-                "openai-compatible",
-                model,
-                baseUrl,
-                apiKey
-        );
+        return new AgentCredentials("openai-compatible", model, baseUrl, apiKey);
     }
 
     private Path resolvePath() {
-        List<Path> candidates = blank(configuredPath)
-                ? List.of(Path.of("llm"), Path.of("..", "llm"))
-                : List.of(Path.of(configuredPath));
-        return candidates.stream().map(Path::toAbsolutePath).map(Path::normalize)
-                .filter(Files::isRegularFile).findFirst()
+        List<Path> candidates =
+                blank(configuredPath)
+                        ? List.of(Path.of("llm"), Path.of("..", "llm"))
+                        : List.of(Path.of(configuredPath));
+        return candidates.stream()
+                .map(Path::toAbsolutePath)
+                .map(Path::normalize)
+                .filter(Files::isRegularFile)
+                .findFirst()
                 .orElseThrow(() -> unavailable("未找到 llm 配置文件"));
     }
 
@@ -95,15 +93,17 @@ public class AgentCredentialService {
     }
 
     private String stripQuotes(String value) {
-        if (value.length() >= 2 && ((value.startsWith("\"") && value.endsWith("\""))
-                || (value.startsWith("'") && value.endsWith("'")))) {
+        if (value.length() >= 2
+                && ((value.startsWith("\"") && value.endsWith("\""))
+                        || (value.startsWith("'") && value.endsWith("'")))) {
             return value.substring(1, value.length() - 1).trim();
         }
         return value;
     }
 
     private ApiException unavailable(String message) {
-        return new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "MODEL_PROVIDER_UNAVAILABLE", message);
+        return new ApiException(
+                HttpStatus.SERVICE_UNAVAILABLE, "MODEL_PROVIDER_UNAVAILABLE", message);
     }
 
     private boolean blank(String value) {

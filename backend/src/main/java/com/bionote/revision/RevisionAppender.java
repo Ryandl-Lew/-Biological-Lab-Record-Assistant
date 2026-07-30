@@ -7,7 +7,15 @@ import java.util.UUID;
 public interface RevisionAppender {
     void append(RevisionRecord revision);
 
-    record RevisionRecord(UUID id, UUID recordId, int revisionNo, String snapshotJson,
-                          int snapshotSchemaVersion, String contentHash, String submitNote,
-                          UUID submittedBy, Instant submittedAt, String idempotencyKey) {}
+    record RevisionRecord(
+            UUID id,
+            UUID recordId,
+            int revisionNo,
+            String snapshotJson,
+            int snapshotSchemaVersion,
+            String contentHash,
+            String submitNote,
+            UUID submittedBy,
+            Instant submittedAt,
+            String idempotencyKey) {}
 }

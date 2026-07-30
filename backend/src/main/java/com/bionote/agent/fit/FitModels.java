@@ -11,7 +11,8 @@ public final class FitModels {
 
     public record SkipInfo(UUID recordId, String recordCode, String reason) {}
 
-    public record ModelComparison(String equation, double rSquared, double rmse, int n, boolean selected) {}
+    public record ModelComparison(
+            String equation, double rSquared, double rmse, int n, boolean selected) {}
 
     public record FitIntent(
             boolean fitRequested,
@@ -24,8 +25,7 @@ public final class FitModels {
             List<String> statuses,
             String experimentType,
             String keyword,
-            String missingPrompt
-    ) {}
+            String missingPrompt) {}
 
     public record FitProposal(
             boolean fitRequested,
@@ -43,16 +43,23 @@ public final class FitModels {
             String rationale,
             String missingPrompt,
             boolean multivariate,
-            boolean timeToMinutes
-    ) {
+            boolean timeToMinutes) {
         public FitIntent toIntent() {
             // Univariate extract uses the first x/y when multiple are provided.
             String x = firstSpec(xSpec);
             String y = firstSpec(ySpec);
-            return new FitIntent(true, equation, x, y, pointSource, csvNameHint,
+            return new FitIntent(
+                    true,
+                    equation,
+                    x,
+                    y,
+                    pointSource,
+                    csvNameHint,
                     recordCodes == null ? List.of() : recordCodes,
                     statuses == null ? List.of() : statuses,
-                    experimentType, keyword, missingPrompt);
+                    experimentType,
+                    keyword,
+                    missingPrompt);
         }
 
         private static String firstSpec(String spec) {
@@ -72,8 +79,7 @@ public final class FitModels {
             List<SkipInfo> skipped,
             List<Map<String, Double>> curveSample,
             List<Map<String, Object>> points,
-            List<ModelComparison> comparisons
-    ) {
+            List<ModelComparison> comparisons) {
         public FitResult {
             comparisons = comparisons == null ? List.of() : List.copyOf(comparisons);
         }
@@ -87,10 +93,11 @@ public final class FitModels {
             String status,
             String experimentType,
             List<String> numericFieldKeys,
-            List<CatalogFile> tableFiles
-    ) {
+            List<CatalogFile> tableFiles) {
         public List<String> csvFilenames() {
-            return tableFiles == null ? List.of() : tableFiles.stream().map(CatalogFile::filename).toList();
+            return tableFiles == null
+                    ? List.of()
+                    : tableFiles.stream().map(CatalogFile::filename).toList();
         }
     }
 }

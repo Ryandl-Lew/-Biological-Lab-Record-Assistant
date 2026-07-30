@@ -28,9 +28,9 @@ revision:
 agent:
   enabled: ${AGENT_ENABLED:false}
   provider: ${AGENT_PROVIDER:openai-compatible}
-  base-url: ""
-  api-key: ""
-  model: ""
+  base-url: ''
+  api-key: ''
+  model: ''
   timeout-ms: ${AGENT_TIMEOUT_MS:30000}
   worker-poll-ms: ${AGENT_WORKER_POLL_MS:1000}
   worker-stale-timeout-ms: ${AGENT_WORKER_STALE_TIMEOUT_MS:600000}

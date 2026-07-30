@@ -73,7 +73,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev,real-llm
       LLM_CONFIG_PATH: /run/secrets/bionote-llm
-      DEV_SEED_ENABLED: "false"
+      DEV_SEED_ENABLED: 'false'
     volumes:
       - /srv/bionote/llm:/run/secrets/bionote-llm:ro
 ```
@@ -89,7 +89,7 @@ env:
   - name: LLM_CONFIG_PATH
     value: /run/secrets/bionote/llm
   - name: DEV_SEED_ENABLED
-    value: "false"
+    value: 'false'
 volumeMounts:
   - name: llm-config
     mountPath: /run/secrets/bionote

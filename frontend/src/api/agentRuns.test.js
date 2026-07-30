@@ -1,10 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { cancelAgentRun, createProjectAgentRun, createRecordAgentRun, fetchAgentArtifact, fetchAgentRun, fetchAgentSteps, fetchProjectArtifacts, fetchRecordArtifacts, rerunAgent } from './agentRuns'
+import {
+  cancelAgentRun,
+  createProjectAgentRun,
+  createRecordAgentRun,
+  fetchAgentArtifact,
+  fetchAgentRun,
+  fetchAgentSteps,
+  fetchProjectArtifacts,
+  fetchRecordArtifacts,
+  rerunAgent,
+} from './agentRuns'
 
 describe('agent runs api', () => {
   beforeEach(() => {
     localStorage.clear()
-    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ data: { id: 'x' } }) })
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue({ ok: true, status: 200, json: async () => ({ data: { id: 'x' } }) })
   })
 
   it('uses unified client and idempotency headers for writes', async () => {
@@ -12,7 +24,11 @@ describe('agent runs api', () => {
     await createProjectAgentRun('p1', { artifactKind: 'PROJECT_PROGRESS' }, 'key-2')
     await rerunAgent('run-1', 'key-3')
     await cancelAgentRun('run-1')
-    expect(fetch).toHaveBeenNthCalledWith(1, '/api/v1/records/r1/agent-runs', expect.objectContaining({ method: 'POST', headers: expect.any(Headers) }))
+    expect(fetch).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/records/r1/agent-runs',
+      expect.objectContaining({ method: 'POST', headers: expect.any(Headers) }),
+    )
     expect(fetch.mock.calls[0][1].headers.get('Idempotency-Key')).toBe('key-1')
     expect(fetch.mock.calls[1][1].headers.get('Idempotency-Key')).toBe('key-2')
     expect(fetch.mock.calls[2][1].headers.get('Idempotency-Key')).toBe('key-3')

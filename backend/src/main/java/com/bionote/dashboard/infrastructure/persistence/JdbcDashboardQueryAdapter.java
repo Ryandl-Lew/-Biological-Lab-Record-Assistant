@@ -2,16 +2,110 @@ package com.bionote.dashboard.infrastructure.persistence;
 
 import com.bionote.dashboard.DashboardDtos;
 import com.bionote.dashboard.DashboardQueryStore;
+import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
-import java.time.Instant;
-import java.util.*;
 
 @Repository
 public class JdbcDashboardQueryAdapter implements DashboardQueryStore {
-    private final JdbcTemplate jdbc;public JdbcDashboardQueryAdapter(JdbcTemplate jdbc){this.jdbc=jdbc;}
+    private final JdbcTemplate jdbc;
 
-    public List<DashboardDtos.Task> tasks(UUID user){List<DashboardDtos.Task> result=new ArrayList<>();result.addAll(jdbc.query("SELECT r.id,r.title,r.project_id,p.name,r.updated_at FROM experiment_records r JOIN projects p ON p.id=r.project_id JOIN project_members pm ON pm.project_id=r.project_id AND pm.user_id=? WHERE r.creator_id=? AND r.status='CHANGES_REQUESTED' AND r.deleted_at IS NULL AND p.status='ACTIVE' ORDER BY r.updated_at",(rs,n)->new DashboardDtos.Task("changes:"+rs.getString("id"),"CHANGES_REQUESTED",UUID.fromString(rs.getString("id")),rs.getString("title"),UUID.fromString(rs.getString("project_id")),rs.getString("name"),rs.getTimestamp("updated_at").toInstant(),null,"继续修改",false),user.toString(),user.toString()));result.addAll(jdbc.query("SELECT v.id review_id,r.id,r.title,r.project_id,p.name,v.assigned_at,rv.revision_no FROM reviews v JOIN experiment_records r ON r.id=v.record_id JOIN projects p ON p.id=r.project_id JOIN record_revisions rv ON rv.id=v.revision_id JOIN project_members pm ON pm.project_id=r.project_id AND pm.user_id=? WHERE v.reviewer_id=? AND v.status='PENDING' AND r.status='IN_REVIEW' AND r.current_review_id=v.id AND p.status='ACTIVE' ORDER BY v.assigned_at",(rs,n)->new DashboardDtos.Task("review:"+rs.getString("review_id"),"PENDING_REVIEW",UUID.fromString(rs.getString("id")),rs.getString("title"),UUID.fromString(rs.getString("project_id")),rs.getString("name"),rs.getTimestamp("assigned_at").toInstant(),rs.getInt("revision_no"),"开始审核",false),user.toString(),user.toString()));result.addAll(jdbc.query("SELECT i.id,i.project_id,p.name,i.created_at FROM project_invitations i JOIN projects p ON p.id=i.project_id WHERE i.invitee_user_id=? AND i.status='PENDING' AND i.expires_at>CURRENT_TIMESTAMP AND p.status='ACTIVE' ORDER BY i.created_at",(rs,n)->new DashboardDtos.Task("invitation:"+rs.getString("id"),"PROJECT_INVITATION",UUID.fromString(rs.getString("id")),"加入项目「"+rs.getString("name")+"」",UUID.fromString(rs.getString("project_id")),rs.getString("name"),rs.getTimestamp("created_at").toInstant(),null,"处理邀请",false),user.toString()));result.sort(Comparator.comparingInt((DashboardDtos.Task t)->switch(t.type()){case "CHANGES_REQUESTED"->0;case "PENDING_REVIEW"->1;default->2;}).thenComparing(DashboardDtos.Task::time));return result;}
-    public DashboardDtos.Summary summary(UUID user){long projects=count("SELECT COUNT(*) FROM project_members WHERE user_id=?",user),editable=count("SELECT COUNT(*) FROM experiment_records r JOIN projects p ON p.id=r.project_id WHERE r.creator_id=? AND r.deleted_at IS NULL AND r.provisional=FALSE AND p.status='ACTIVE' AND r.status IN ('IN_PROGRESS','CHANGES_REQUESTED')",user),changes=count("SELECT COUNT(*) FROM experiment_records r JOIN projects p ON p.id=r.project_id WHERE r.creator_id=? AND r.deleted_at IS NULL AND r.provisional=FALSE AND p.status='ACTIVE' AND r.status='CHANGES_REQUESTED'",user),reviews=count("SELECT COUNT(*) FROM reviews v JOIN experiment_records r ON r.id=v.record_id JOIN project_members pm ON pm.project_id=r.project_id AND pm.user_id=? WHERE v.reviewer_id=? AND v.status='PENDING' AND r.status='IN_REVIEW' AND r.current_review_id=v.id",user,user),invites=count("SELECT COUNT(*) FROM project_invitations i JOIN projects p ON p.id=i.project_id WHERE i.invitee_user_id=? AND i.status='PENDING' AND i.expires_at>CURRENT_TIMESTAMP AND p.status='ACTIVE'",user),unread=count("SELECT COUNT(*) FROM notifications WHERE recipient_id=? AND read_at IS NULL",user);return new DashboardDtos.Summary(projects,editable,changes,reviews,invites,unread);}
-    private long count(String sql,UUID... ids){Object[]args=Arrays.stream(ids).map(UUID::toString).toArray();return jdbc.queryForObject(sql,Long.class,args);}
+    public JdbcDashboardQueryAdapter(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    public List<DashboardDtos.Task> tasks(UUID user) {
+        List<DashboardDtos.Task> result = new ArrayList<>();
+        result.addAll(
+                jdbc.query(
+                        "SELECT r.id,r.title,r.project_id,p.name,r.updated_at FROM experiment_records r JOIN projects p ON p.id=r.project_id JOIN project_members pm ON pm.project_id=r.project_id AND pm.user_id=? WHERE r.creator_id=? AND r.status='CHANGES_REQUESTED' AND r.deleted_at IS NULL AND p.status='ACTIVE' ORDER BY r.updated_at",
+                        (rs, n) ->
+                                new DashboardDtos.Task(
+                                        "changes:" + rs.getString("id"),
+                                        "CHANGES_REQUESTED",
+                                        UUID.fromString(rs.getString("id")),
+                                        rs.getString("title"),
+                                        UUID.fromString(rs.getString("project_id")),
+                                        rs.getString("name"),
+                                        rs.getTimestamp("updated_at").toInstant(),
+                                        null,
+                                        "继续修改",
+                                        false),
+                        user.toString(),
+                        user.toString()));
+        result.addAll(
+                jdbc.query(
+                        "SELECT v.id review_id,r.id,r.title,r.project_id,p.name,v.assigned_at,rv.revision_no FROM reviews v JOIN experiment_records r ON r.id=v.record_id JOIN projects p ON p.id=r.project_id JOIN record_revisions rv ON rv.id=v.revision_id JOIN project_members pm ON pm.project_id=r.project_id AND pm.user_id=? WHERE v.reviewer_id=? AND v.status='PENDING' AND r.status='IN_REVIEW' AND r.current_review_id=v.id AND p.status='ACTIVE' ORDER BY v.assigned_at",
+                        (rs, n) ->
+                                new DashboardDtos.Task(
+                                        "review:" + rs.getString("review_id"),
+                                        "PENDING_REVIEW",
+                                        UUID.fromString(rs.getString("id")),
+                                        rs.getString("title"),
+                                        UUID.fromString(rs.getString("project_id")),
+                                        rs.getString("name"),
+                                        rs.getTimestamp("assigned_at").toInstant(),
+                                        rs.getInt("revision_no"),
+                                        "开始审核",
+                                        false),
+                        user.toString(),
+                        user.toString()));
+        result.addAll(
+                jdbc.query(
+                        "SELECT i.id,i.project_id,p.name,i.created_at FROM project_invitations i JOIN projects p ON p.id=i.project_id WHERE i.invitee_user_id=? AND i.status='PENDING' AND i.expires_at>CURRENT_TIMESTAMP AND p.status='ACTIVE' ORDER BY i.created_at",
+                        (rs, n) ->
+                                new DashboardDtos.Task(
+                                        "invitation:" + rs.getString("id"),
+                                        "PROJECT_INVITATION",
+                                        UUID.fromString(rs.getString("id")),
+                                        "加入项目「" + rs.getString("name") + "」",
+                                        UUID.fromString(rs.getString("project_id")),
+                                        rs.getString("name"),
+                                        rs.getTimestamp("created_at").toInstant(),
+                                        null,
+                                        "处理邀请",
+                                        false),
+                        user.toString()));
+        result.sort(
+                Comparator.comparingInt(
+                                (DashboardDtos.Task t) ->
+                                        switch (t.type()) {
+                                            case "CHANGES_REQUESTED" -> 0;
+                                            case "PENDING_REVIEW" -> 1;
+                                            default -> 2;
+                                        })
+                        .thenComparing(DashboardDtos.Task::time));
+        return result;
+    }
+
+    public DashboardDtos.Summary summary(UUID user) {
+        long projects = count("SELECT COUNT(*) FROM project_members WHERE user_id=?", user),
+                editable =
+                        count(
+                                "SELECT COUNT(*) FROM experiment_records r JOIN projects p ON p.id=r.project_id WHERE r.creator_id=? AND r.deleted_at IS NULL AND r.provisional=FALSE AND p.status='ACTIVE' AND r.status IN ('IN_PROGRESS','CHANGES_REQUESTED')",
+                                user),
+                changes =
+                        count(
+                                "SELECT COUNT(*) FROM experiment_records r JOIN projects p ON p.id=r.project_id WHERE r.creator_id=? AND r.deleted_at IS NULL AND r.provisional=FALSE AND p.status='ACTIVE' AND r.status='CHANGES_REQUESTED'",
+                                user),
+                reviews =
+                        count(
+                                "SELECT COUNT(*) FROM reviews v JOIN experiment_records r ON r.id=v.record_id JOIN project_members pm ON pm.project_id=r.project_id AND pm.user_id=? WHERE v.reviewer_id=? AND v.status='PENDING' AND r.status='IN_REVIEW' AND r.current_review_id=v.id",
+                                user,
+                                user),
+                invites =
+                        count(
+                                "SELECT COUNT(*) FROM project_invitations i JOIN projects p ON p.id=i.project_id WHERE i.invitee_user_id=? AND i.status='PENDING' AND i.expires_at>CURRENT_TIMESTAMP AND p.status='ACTIVE'",
+                                user),
+                unread =
+                        count(
+                                "SELECT COUNT(*) FROM notifications WHERE recipient_id=? AND read_at IS NULL",
+                                user);
+        return new DashboardDtos.Summary(projects, editable, changes, reviews, invites, unread);
+    }
+
+    private long count(String sql, UUID... ids) {
+        Object[] args = Arrays.stream(ids).map(UUID::toString).toArray();
+        return jdbc.queryForObject(sql, Long.class, args);
+    }
 }
