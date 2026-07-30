@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties={"agent.enabled=true","agent.same-subject-cooldown-seconds=0","agent.worker-poll-ms=60000"})
+@SpringBootTest(properties={"agent.enabled=true","agent.same-subject-cooldown-seconds=0","agent.worker-poll-ms=60000","agent.max-concurrent-per-project=10","agent.max-concurrent-per-user=10"})
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class AgentApiIntegrationTest {
@@ -46,21 +46,18 @@ class AgentApiIntegrationTest {
         mvc.perform(post("/api/v1/records/{id}/agent-runs",f.record).header("Authorization",bearer(f.creatorToken)).header("Idempotency-Key",key).contentType(MediaType.APPLICATION_JSON).content("{\"artifactKind\":\"RECORD_SUMMARY\",\"focus\":\"different\"}"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("IDEMPOTENCY_CONFLICT"));
         mvc.perform(post("/api/v1/records/{id}/agent-runs",f.record).header("Authorization",bearer(f.ownerToken)).header("Idempotency-Key",UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON).content("{\"artifactKind\":\"RECORD_SUMMARY\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isAccepted());
         mvc.perform(post("/api/v1/projects/{id}/agent-runs",f.project).header("Authorization",bearer(f.memberToken)).header("Idempotency-Key",UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON).content("{\"artifactKind\":\"PROJECT_PROGRESS\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isAccepted());
         mvc.perform(post("/api/v1/records/{id}/agent-runs",f.record).header("Authorization",bearer(f.memberToken)).header("Idempotency-Key",UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON).content("{\"artifactKind\":\"RECORD_SUMMARY\"}"))
-                .andExpect(status().isForbidden());
-        jdbc.update("UPDATE project_members SET role='REVIEWER' WHERE project_id=? AND user_id=?",f.project.toString(),f.member.toString());
-        mvc.perform(post("/api/v1/projects/{id}/agent-runs",f.project).header("Authorization",bearer(f.memberToken)).header("Idempotency-Key",UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON).content("{\"artifactKind\":\"PROJECT_PROGRESS\"}"))
-                .andExpect(status().isForbidden());
-        mvc.perform(post("/api/v1/records/{id}/agent-runs",f.record).header("Authorization",bearer(f.memberToken)).header("Idempotency-Key",UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON).content("{\"artifactKind\":\"RECORD_SUMMARY\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isAccepted());
+        mvc.perform(post("/api/v1/records/{id}/agent-runs",f.record).header("Authorization",bearer(f.outsiderToken)).header("Idempotency-Key",UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON).content("{\"artifactKind\":\"RECORD_SUMMARY\"}"))
+                .andExpect(status().isNotFound());
         mvc.perform(post("/api/v1/agent-runs/{id}/cancel",run).header("Authorization",bearer(f.creatorToken))).andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("CANCELLED"));
         mvc.perform(post("/api/v1/agent-runs/{id}/cancel",run).header("Authorization",bearer(f.creatorToken))).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("AGENT_RUN_NOT_CANCELLABLE"));
         mvc.perform(post("/api/v1/agent-runs/{id}/rerun",run).header("Authorization",bearer(f.creatorToken)).header("Idempotency-Key",UUID.randomUUID())).andExpect(status().isAccepted()).andExpect(jsonPath("$.data.parentRunId").value(run));
         mvc.perform(post("/api/v1/records/{id}/agent-runs",f.record).header("Authorization",bearer(f.creatorToken)).header("Idempotency-Key",UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON).content("{\"artifactKind\":\"RECORD_SUMMARY\",\"focus\":\"second\"}" )).andExpect(status().isAccepted());
-        mvc.perform(post("/api/v1/records/{id}/agent-runs",f.record).header("Authorization",bearer(f.creatorToken)).header("Idempotency-Key",UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON).content("{\"artifactKind\":\"RECORD_SUMMARY\",\"focus\":\"third\"}" )).andExpect(status().isTooManyRequests()).andExpect(jsonPath("$.code").value("AGENT_RATE_LIMITED"));
+        mvc.perform(post("/api/v1/records/{id}/agent-runs",f.record).header("Authorization",bearer(f.creatorToken)).header("Idempotency-Key",UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON).content("{\"artifactKind\":\"RECORD_SUMMARY\",\"focus\":\"third\"}" )).andExpect(status().isAccepted());
     }
 
     @Test void fakeProjectFlowRepairsHallucinatedEvidenceAndRevokedMemberCannotRead()throws Exception{

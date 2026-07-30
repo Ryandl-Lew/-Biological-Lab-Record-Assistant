@@ -20,6 +20,11 @@
 
   body {
     @apply bg-slate-50 font-sans text-sm leading-relaxed text-slate-900;
+    background-image: url('../source/background.svg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
   }
 
   ::selection {

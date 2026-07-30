@@ -14,7 +14,7 @@ export default function AppLayout() {
   useRecentTracker()
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen">
       {/* 桌面端固定侧边栏 */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-30 lg:flex lg:w-64 lg:flex-col">
         <Sidebar />
@@ -27,7 +27,7 @@ export default function AppLayout() {
             className="absolute inset-0 animate-fade-in bg-slate-900/50"
             onClick={() => setMobileNavOpen(false)}
           />
-          <div className="absolute inset-y-0 left-0 w-64 animate-fade-in bg-white shadow-2xl">
+          <div className="absolute inset-y-0 left-0 w-64 animate-fade-in bg-white/70 shadow-2xl backdrop-blur-sm">
             <Sidebar onNavigate={() => setMobileNavOpen(false)} />
           </div>
         </div>

@@ -1,8 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createProjectAgentRun, createRecordAgentRun, fetchProjectArtifacts, fetchRecordArtifacts } from '@/api'
-import { useAuthStore } from '@/store/authStore'
+import { createProjectAgentRun, fetchProjectArtifacts, fetchRecordArtifacts } from '@/api'
 import ProgressReportPanel from './ProgressReportPanel'
 import RecordSummaryPanel from './RecordSummaryPanel'
 
@@ -18,17 +17,10 @@ describe('Agent report panels', () => {
     fetchProjectArtifacts.mockResolvedValue({ items: [], meta: { totalElements: 0 } })
   })
 
-  it('lets only the record creator generate a record summary', async () => {
-    useAuthStore.setState({ currentUser: { id: 'creator' } })
-    createRecordAgentRun.mockResolvedValue({ id: 'run-record', status: 'QUEUED' })
-    const onRunId = vi.fn()
-    const { rerender } = render(<RecordSummaryPanel record={{ id: 'record', creatorId: 'creator', currentRevisionNo: 0 }} onRunId={onRunId} />)
-    await userEvent.click(await screen.findByRole('button', { name: '生成总结' }))
-    expect(createRecordAgentRun).toHaveBeenCalledWith('record', { artifactKind: 'RECORD_SUMMARY' }, expect.any(String))
-    expect(onRunId).toHaveBeenCalledWith('run-record')
-    useAuthStore.setState({ currentUser: { id: 'member' } })
-    rerender(<RecordSummaryPanel record={{ id: 'record', creatorId: 'creator', currentRevisionNo: 1 }} onRunId={vi.fn()} />)
-    await waitFor(() => expect(screen.queryByRole('button', { name: '生成总结' })).not.toBeInTheDocument())
+  it('renders the record Q&A chat panel', async () => {
+    render(<RecordSummaryPanel record={{ id: 'record', creatorId: 'creator', currentRevisionNo: 0 }} />)
+    expect(screen.getByText('记录问答')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('输入问题，Enter 发送，Shift+Enter 换行')).toBeInTheDocument()
   })
 
   it('lets only the project owner generate progress reports', async () => {

@@ -31,12 +31,6 @@ public class FitIntentParser {
         FitModels.FitIntent fromJson = tryJson(message);
         if (fromJson != null) return fromJson;
 
-        boolean requested = message.contains("拟合") || message.toLowerCase(Locale.ROOT).contains("fit")
-                || EQUATION.matcher(message).find();
-        if (!requested) {
-            return new FitModels.FitIntent(false, null, null, null, null, null, List.of(), List.of(), null, null, null);
-        }
-
         String equation = firstGroup(EQUATION, message);
         if (equation != null) {
             equation = equation.trim();
@@ -47,6 +41,12 @@ public class FitIntentParser {
         }
         String xSpec = firstGroup(X_SPEC, message);
         String ySpec = firstGroup(Y_SPEC, message);
+
+        // Only treat as a fit request when concrete parameters are provided
+        boolean requested = equation != null || (xSpec != null && ySpec != null);
+        if (!requested) {
+            return new FitModels.FitIntent(false, null, null, null, null, null, List.of(), List.of(), null, null, null);
+        }
 
         List<String> statuses = new ArrayList<>();
         String upper = message.toUpperCase(Locale.ROOT);
@@ -84,8 +84,8 @@ public class FitIntentParser {
         if (csvMatcher.find()) csvHint = csvMatcher.group(1);
 
         String missing = null;
-        if (equation == null) missing = "请提供拟合方程，例如：y = a + b*x";
-        else if (xSpec == null || ySpec == null) missing = "请指定自变量与因变量，例如：xField=concentration，yField=ct；或 CSV 列名/列号";
+        if (equation == null && (xSpec == null || ySpec == null)) missing = "请指定拟合方程（如 y = a + b*x）或自变量/因变量列名（如 xField=concentration yField=ct）";
+        else if (equation != null && (xSpec == null || ySpec == null)) missing = "请指定自变量与因变量，例如：xField=concentration，yField=ct；或 CSV 列名/列号";
 
         return new FitModels.FitIntent(true, equation, xSpec, ySpec, pointSource, csvHint, codes, statuses, experimentType, null, missing);
     }

@@ -43,6 +43,17 @@ export default function RecordEditorMvpPage() {
   useEffect(() => { if (recordId) loadExisting(); else setError('缺少记录编号，请返回创建流程重新选择项目与模板') }, [loadExisting, recordId])
   useEffect(() => { const before = (event) => { if (dirty) { event.preventDefault(); event.returnValue = '' } }; window.addEventListener('beforeunload', before); return () => window.removeEventListener('beforeunload', before) }, [dirty])
 
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+        event.preventDefault()
+        save(event)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  })
+
   const markChanged = () => { editSequenceRef.current += 1; setDirty(true); setState('未保存') }
   const change = (key, value) => { setForm((current) => ({ ...current, [key]: value })); markChanged() }
   const fields = record?.templateSnapshot?.fields || template?.fields || []
@@ -101,7 +112,7 @@ export default function RecordEditorMvpPage() {
       <Surface title="记录正文"><RichTextEditor html={form.contentHtml} onChange={(json, html) => { setForm((current) => ({ ...current, contentJson: json, contentHtml: html })); markChanged() }} /></Surface></div>
       <aside className="space-y-4 xl:sticky xl:top-20"><Surface title="保存与审核"><div className="rounded-lg bg-slate-50 p-3"><p className="flex items-center gap-2 text-sm font-medium"><Clock3 size={15} className="text-slate-400"/>{record.provisional ? '首次保存前不自动保存' : '每 30 秒自动保存'}</p><p className="mt-1 text-xs text-slate-400">{lastSavedAt ? `最近保存：${lastSavedAt.toLocaleTimeString()}` : '尚未保存'}</p></div>{!formComplete && dirty && <p className="mt-3 text-xs text-amber-700">请填写所有必填字段后保存。</p>}<div className="mt-4 grid gap-2"><Button type="submit" icon={Save} loading={saving} disabled={!dirty || !formComplete}>保存</Button><Button type="button" variant="secondary" icon={record.provisional ? Trash2 : ArrowLeft} disabled={saving} onClick={cancel}>{record.provisional ? '舍弃本次记录' : '取消本次编辑'}</Button><Button type="button" variant="secondary" icon={Send} disabled={record.provisional || dirty || saving || !record.capabilities.canSubmit} onClick={() => setSubmitOpen(true)}>提交审核</Button></div></Surface><AttachmentManager compact recordId={record.id} onChange={() => loadRelated(record.id)}/></aside>
     </form>
-    {conflict && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><div className="w-full max-w-md rounded-2xl bg-white p-6"><AlertTriangle className="text-amber-500" /><h2 className="mt-3 text-lg font-semibold">检测到版本冲突</h2><p className="mt-2 text-sm text-slate-600">另一页面已经保存了更新。当前本地内容会保留在页面中供复制。</p><div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={() => setConflict(false)}>保留本地内容</Button><Button onClick={async () => { setConflict(false); await loadExisting() }}>重新加载最新内容</Button></div></div></div>}
+    {conflict && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><div className="w-full max-w-md rounded-2xl bg-white/95 p-6 backdrop-blur-sm"><AlertTriangle className="text-amber-500" /><h2 className="mt-3 text-lg font-semibold">检测到版本冲突</h2><p className="mt-2 text-sm text-slate-600">另一页面已经保存了更新。当前本地内容会保留在页面中供复制。</p><div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={() => setConflict(false)}>保留本地内容</Button><Button onClick={async () => { setConflict(false); await loadExisting() }}>重新加载最新内容</Button></div></div></div>}
     {record && <SubmissionDialog record={record} open={submitOpen} onClose={() => setSubmitOpen(false)} onSubmitted={() => navigate(`/records/${record.id}`, { replace: true })} />}
   </section>
 }

@@ -68,7 +68,7 @@ export default function TasksPanel() {
     + (summary?.pendingInvitationCount ?? 0)
 
   return (
-    <section aria-label="待处理事项" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
+    <section aria-label="待处理事项" className="rounded-2xl border border-slate-200/60 bg-white/40 p-5 shadow-card backdrop-blur-sm">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">待处理事项</h2>
         {!loading && (

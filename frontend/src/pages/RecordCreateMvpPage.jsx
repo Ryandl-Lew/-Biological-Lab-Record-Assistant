@@ -50,7 +50,7 @@ export default function RecordCreateMvpPage() {
 
   const TemplateCard = ({ item, blank = false }) => {
     const selected = blank ? !templateId : templateId === item.id
-    return <button type="button" onClick={() => setTemplateId(blank ? '' : item.id)} className={`relative rounded-xl border p-4 text-left transition ${selected ? 'border-brand-500 bg-brand-50/70 shadow-sm ring-1 ring-brand-500' : 'border-slate-200 bg-white hover:border-brand-300 hover:shadow-sm'}`}>
+    return <button type="button" onClick={() => setTemplateId(blank ? '' : item.id)} className={`relative rounded-xl border p-4 text-left transition ${selected ? 'border-brand-500 bg-brand-50/70 shadow-sm ring-1 ring-brand-500' : 'border-slate-200 bg-white/85 hover:border-brand-300 hover:shadow-sm'}`}>
       {selected && <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-brand-600 text-white"><Check size={12}/></span>}
       <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${blank ? 'bg-slate-100 text-slate-600' : 'bg-indigo-50 text-indigo-600'}`}>{blank ? <FilePlus2 size={19}/> : <LayoutTemplate size={19}/>}</span>
       <span className="mt-3 block pr-7 text-sm font-semibold">{blank ? '空白记录' : item.name}</span>
@@ -64,7 +64,7 @@ export default function RecordCreateMvpPage() {
     <PageHeader eyebrow="实验记录" title="创建实验记录" />
     {error && <p role="alert" className="mb-5 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {loading ? <p className="py-16 text-center text-sm text-slate-400">加载项目与模板中…</p> : <div className="grid gap-6 xl:grid-cols-[minmax(300px,0.85fr),minmax(0,1.65fr)]">
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
+      <section className="rounded-xl border border-slate-200/60 bg-white/85 p-5 shadow-card backdrop-blur-sm">
         <div className="mb-4 flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600"><FolderKanban size={18}/></span><div><h2 className="font-semibold">1. 选择所属项目</h2><p className="text-xs text-slate-400">记录创建后不可更换项目</p></div></div>
         {projects.length ? <div className="space-y-3">{projects.map((item) => {
           const selected = projectId === item.id
@@ -75,7 +75,7 @@ export default function RecordCreateMvpPage() {
           action={<Button size="sm" onClick={() => navigate('/projects')}>前往项目管理</Button>}
         />}
       </section>
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
+      <section className="rounded-xl border border-slate-200/60 bg-white/85 p-5 shadow-card backdrop-blur-sm">
         <div className="mb-4 flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600"><NotebookPen size={18}/></span><div><h2 className="font-semibold">2. 选择记录结构</h2><p className="text-xs text-slate-400">模板会作为结构快照固化到记录中</p></div></div>
         <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3"><TemplateCard blank/>{systemTemplates.map((item) => <TemplateCard key={item.id} item={item}/>)}</div>
         {personalTemplates.length > 0 && <><div className="my-5 flex items-center gap-3"><span className="h-px flex-1 bg-slate-200"/><span className="text-xs font-medium text-slate-400">我的模板</span><span className="h-px flex-1 bg-slate-200"/></div><div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">{personalTemplates.map((item) => <TemplateCard key={item.id} item={item}/>)}</div></>}

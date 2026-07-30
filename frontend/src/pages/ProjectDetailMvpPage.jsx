@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Archive, ArrowLeft, CalendarDays, CheckCircle2, CircleUserRound, FileCheck2, FolderPlus, History, Mail, Paperclip, Plus, UserPlus, Users } from 'lucide-react'
+import { Archive, ArrowLeft, CalendarDays, CheckCircle2, CircleUserRound, ExternalLink, FileCheck2, FolderPlus, History, Mail, Paperclip, Plus, UserPlus, Users, X } from 'lucide-react'
 import {
   archiveProject,
   fetchProject,
@@ -15,8 +15,8 @@ import {
 import { Badge, Button, EmptyState, StatusBadge, Surface, Tabs } from '@/components/ui'
 import { PROJECT_ROLE_LABELS, PROJECT_ROLE_TONES } from '@/domain'
 
-const ProgressReportPanel = lazy(() => import('@/components/agent/ProgressReportPanel'))
 import TimelineGraph from '@/components/timeline/TimelineGraph.jsx'
+const AutoSummaryPanel = lazy(() => import('@/components/agent/AutoSummaryPanel'))
 
 const EVENT_LABELS = {
   PROJECT_CREATED: '创建了项目',
@@ -90,6 +90,7 @@ export default function ProjectDetailMvpPage() {
   const [error, setError] = useState('')
   const [loadingTab, setLoadingTab] = useState(false)
   const [showInvite, setShowInvite] = useState(false)
+  const [timelineDetail, setTimelineDetail] = useState(null)
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -164,11 +165,11 @@ export default function ProjectDetailMvpPage() {
   const active = project.status === 'ACTIVE'
   const tabs = [
     { key: 'overview', label: '概览' },
-    { key: 'members', label: `成员 ${members.length}` },
-    { key: 'records', label: `实验记录 ${project.recordCount}` },
+    { key: 'members', label: '成员' },
+    { key: 'records', label: '实验记录' },
     { key: 'timeline', label: '时间线' },
     { key: 'attachments', label: '附件汇总' },
-    { key: 'progress', label: '智能进展' },
+    { key: 'autosummary', label: '自动总结' },
   ]
 
   const invite = async (event) => {
@@ -179,14 +180,6 @@ export default function ProjectDetailMvpPage() {
   }
   const archive = () => {
     if (confirm('归档不可恢复。确认归档该项目？')) act(() => archiveProject(projectId))
-  }
-  const setRunId = (run) => { const next = new URLSearchParams(searchParams); next.set('tab', 'progress'); if (run) next.set('run', run); else next.delete('run'); setSearchParams(next, { replace: true }) }
-  const navigateEvidence = (evidence) => {
-    if (evidence.type === 'RECORD') navigate(`/records/${evidence.recordId || evidence.id}`)
-    else if (evidence.type === 'REVISION') navigate(`/records/${evidence.recordId}?tab=history&revision=${evidence.revisionId || evidence.id}`)
-    else if (evidence.type === 'REVISION_DIFF') navigate(`/records/${evidence.recordId}?tab=history&from=${evidence.fromRevisionId}&to=${evidence.toRevisionId}`)
-    else if (evidence.type === 'REVIEW') navigate(`/records/${evidence.recordId}#record-review`)
-    else if (evidence.type === 'AUDIT_EVENT') changeTab('timeline')
   }
 
   return (
@@ -220,16 +213,18 @@ export default function ProjectDetailMvpPage() {
             labels={EVENT_LABELS}
             icons={EVENT_ICONS}
             members={members}
-            onNavigateRecord={(recordId) => navigate(`/records/${recordId}`)}
+            onViewDetail={setTimelineDetail}
             emptyMessage="暂无协作事件"
           />}
       </Surface>}
 
       {tab === 'attachments' && <Surface title="记录附件汇总"><p className="mb-4 text-sm text-slate-500">这里只汇总记录附件，不提供项目级上传或删除。</p>{loadingTab ? <p className="py-8 text-center text-sm text-slate-400">加载附件中…</p> : attachments.items.length ? <div className="divide-y">{attachments.items.map((attachment) => <button id={`attachment-${attachment.id}`} key={attachment.id} onClick={() => navigate(`/records/${attachment.recordId}#attachment-${attachment.id}`)} className="flex w-full items-center gap-3 py-3 text-left"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-500"><Paperclip size={16} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{attachment.filename}</span><span className="block truncate text-xs text-slate-400">{attachment.recordCode} · {attachment.recordTitle} · {attachment.uploaderName}</span></span><span className="text-xs text-slate-400">{formatBytes(attachment.sizeBytes)}</span></button>)}</div> : <EmptyState icon={Paperclip} title="暂无记录附件" />}{attachments.meta?.totalPages > 1 && <div className="mt-4 flex justify-end gap-2"><Button size="sm" variant="secondary" disabled={attachmentPage === 0} onClick={() => setAttachmentPage((page) => page - 1)}>上一页</Button><Button size="sm" variant="secondary" disabled={attachmentPage + 1 >= attachments.meta.totalPages} onClick={() => setAttachmentPage((page) => page + 1)}>下一页</Button></div>}</Surface>}
 
-      {tab === 'progress' && <Suspense fallback={<p role="status" className="py-12 text-center text-slate-400">加载智能进展组件中…</p>}><ProgressReportPanel project={project} runId={searchParams.get('run')} onRunId={setRunId} onEvidence={navigateEvidence} /></Suspense>}
+      {tab === 'autosummary' && <Suspense fallback={<p role="status" className="py-12 text-center text-slate-400">加载总结组件中…</p>}><AutoSummaryPanel subjectType="project" subjectId={projectId} /></Suspense>}
 
-      {showInvite && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><form onSubmit={invite} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-pop"><h2 className="text-lg font-semibold">邀请项目成员</h2><p className="mt-1 text-sm text-slate-500">仅可邀请已注册邮箱；接受后默认成为编辑成员。</p><label htmlFor="invite-email" className="field-label mt-5">注册邮箱</label><input id="invite-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required className="input" /><div className="mt-6 flex justify-end gap-2"><Button variant="secondary" onClick={() => setShowInvite(false)}>取消</Button><Button type="submit" loading={busy}>发送邀请</Button></div></form></div>}
+      {timelineDetail && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" onClick={() => setTimelineDetail(null)}><div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white/95 p-6 shadow-pop backdrop-blur-sm" onClick={(e) => e.stopPropagation()}><div className="flex items-start justify-between gap-4"><h2 className="text-lg font-semibold text-slate-900">{EVENT_LABELS[timelineDetail.events[0]?.eventType] || '事件详情'}</h2><button aria-label="关闭" onClick={() => setTimelineDetail(null)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><X size={18} /></button></div><div className="mt-5 space-y-4">{timelineDetail.events.map((event) => { const Icon = EVENT_ICONS[event.eventType]; const meta = event.metadata || {}; return <div key={event.id} className="rounded-xl border border-slate-200 p-4"><div className="flex items-center gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600">{Icon ? <Icon size={15} /> : <FileCheck2 size={15} />}</span><div className="min-w-0 flex-1"><p className="text-sm font-medium text-slate-900">{event.actorName}</p><p className="mt-0.5 text-xs text-slate-400">{new Date(event.createdAt).toLocaleString()}</p></div></div><div className="mt-3 space-y-1.5 border-t border-slate-100 pt-3"><p className="text-sm text-slate-600">{EVENT_LABELS[event.eventType] || event.eventType}</p>{meta.filename && <p className="text-xs text-slate-500">附件：{meta.filename}{meta.sizeBytes ? ` (${formatBytes(meta.sizeBytes)})` : ''}</p>}{meta.title && <p className="text-xs text-slate-500">记录：{meta.title}{meta.code ? ` (${meta.code})` : ''}</p>}{meta.name && <p className="text-xs text-slate-500">名称：{meta.name}</p>}{meta.from && meta.to && <p className="text-xs text-slate-500">审核人变更</p>}{meta.revisionNo && <p className="text-xs text-slate-500">版本：R{meta.revisionNo}</p>}{meta.comment && <p className="rounded-lg bg-slate-50 p-2 text-xs text-slate-600">{meta.comment}</p>}</div></div> })}</div>{timelineDetail.recordId && <div className="mt-5 border-t border-slate-200 pt-4"><Button icon={ExternalLink} onClick={() => { navigate(`/records/${timelineDetail.recordId}`); setTimelineDetail(null) }}>跳转到实验记录</Button></div>}</div></div>}
+
+      {showInvite && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><form onSubmit={invite} className="w-full max-w-md rounded-2xl bg-white/95 p-6 shadow-pop backdrop-blur-sm"><h2 className="text-lg font-semibold">邀请项目成员</h2><p className="mt-1 text-sm text-slate-500">仅可邀请已注册邮箱；接受后默认成为编辑成员。</p><label htmlFor="invite-email" className="field-label mt-5">注册邮箱</label><input id="invite-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required className="input" /><div className="mt-6 flex justify-end gap-2"><Button variant="secondary" onClick={() => setShowInvite(false)}>取消</Button><Button type="submit" loading={busy}>发送邀请</Button></div></form></div>}
     </section>
   )
 }

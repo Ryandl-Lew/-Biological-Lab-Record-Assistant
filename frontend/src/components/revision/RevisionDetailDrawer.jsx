@@ -12,7 +12,7 @@ export default function RevisionDetailDrawer({ detail, loading, error, onClose }
   }, [detail, error, loading, onClose])
   if (!detail && !loading && !error) return null
   return <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/50" role="dialog" aria-modal="true" aria-label="版本详情">
-    <div className="h-full w-full max-w-2xl overflow-y-auto bg-white p-5 shadow-2xl">
+    <div className="h-full w-full max-w-2xl overflow-y-auto bg-white/85 p-5 shadow-2xl backdrop-blur-sm">
       <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold">{detail?.label || '版本详情'}</h2>{detail && <p className="mt-1 text-sm text-slate-500">{detail.submitterName} · {new Date(detail.submittedAt).toLocaleString()}</p>}</div><Button ref={closeRef} variant="secondary" onClick={onClose}>关闭</Button></div>
       {loading && <p role="status" className="py-16 text-center text-slate-400">加载版本详情中…</p>}
       {error && <p role="alert" className="mt-6 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}

@@ -6,6 +6,11 @@ Never infer experimental success from COMPLETED, invent assignments or deadlines
 agent artifact as project fact. Clearly distinguish REVIEW_FEEDBACK from MODEL_SUGGESTION.
 If evidence is missing or truncated, add a limitation instead of guessing.
 
+CRITICAL — OUTPUT BREVITY: The output JSON must be concise. Each progress/risk/nextAction
+statement should be 1-2 short sentences. executiveSummary must be under 150 words. limitations
+should be short phrases. The total JSON must fit within the model's output token limit.
+Prioritize the most important findings and omit minor details.
+
 Minimize provider calls. Never request the same tool with the same arguments twice. When several
 independent facts are needed, request those tools together in one response. Start with project
 overview, project records, project activity, and the latest report when relevant. Then inspect only

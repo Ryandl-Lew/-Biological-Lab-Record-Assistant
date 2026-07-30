@@ -69,7 +69,7 @@ public class AttachmentService implements AttachmentUseCase {
     @Override public FilePayload load(UUID user,UUID id,boolean preview){
         AttachmentStore.AttachmentRecord attachment=attachment(id,false);
         RecordStore.RecordData record=record(attachment.recordId());requireMember(user,record);
-        if(preview&&!attachment.previewable())throw new ApiException(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+        if(preview&&!isPreviewable(attachment.mediaType()))throw new ApiException(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
                 "PREVIEW_NOT_SUPPORTED","该文件类型仅支持下载");
         return new FilePayload(storage.read(attachment.storageKey()),attachment.originalFilename(),attachment.mediaType());
     }
@@ -93,8 +93,14 @@ public class AttachmentService implements AttachmentUseCase {
         String uploaderName=users.findById(attachment.uploaderId()).map(User::getDisplayName).orElse("");
         boolean writable=calculateWritable&&record!=null&&isWritable(user,record);
         return new AttachmentDtos.View(attachment.id(),attachment.recordId(),attachment.originalFilename(),
-                attachment.mediaType(),attachment.sizeBytes(),attachment.previewable(),attachment.uploaderId(),
+                attachment.mediaType(),attachment.sizeBytes(),isPreviewable(attachment.mediaType()),attachment.uploaderId(),
                 uploaderName,attachment.createdAt(),attachment.deletedAt()!=null,writable);
+    }
+
+    private boolean isPreviewable(String mediaType) {
+        if (mediaType == null) return false;
+        return mediaType.startsWith("image/") || mediaType.equals("application/pdf")
+                || mediaType.equals("text/markdown") || mediaType.equals("text/csv");
     }
 
     private AttachmentStore.AttachmentRecord attachment(UUID id,boolean includeDeleted){

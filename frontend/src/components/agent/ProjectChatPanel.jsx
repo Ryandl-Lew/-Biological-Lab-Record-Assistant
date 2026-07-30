@@ -7,24 +7,13 @@ import {
 } from '@/api/agentChat'
 import { Button, Surface } from '@/components/ui'
 import { agentErrorMessage, trimChatHistory } from './messages'
+import { renderMarkdown } from '@/lib/renderMarkdown'
 import DataChart, { chartFromFit } from './DataChart'
 import AgentHelpDialog from './AgentHelpDialog'
 
 function formatNum(value) {
   if (value == null || Number.isNaN(Number(value))) return '—'
   return Number(value).toFixed(4)
-}
-
-function isConfirmPhrase(text) {
-  const value = (text || '').trim().toLowerCase()
-  return (
-    value === '确认' ||
-    value === '确认拟合' ||
-    value === '用这个' ||
-    value === '按方案拟合' ||
-    value.includes('确认按拟定方案') ||
-    value.includes('进行拟合')
-  )
 }
 
 function FitResultCard({ fit }) {
@@ -117,54 +106,6 @@ function ChartResultCard({ chart }) {
   )
 }
 
-function FitProposalCard({ proposal, onConfirm, confirming }) {
-  if (!proposal) return null
-  const mode = proposal.multivariate
-    ? '多元线性回归'
-    : proposal.autoCompare
-      ? `多模型比选（${(proposal.candidateIds || []).join(' / ') || '预置目录'}）`
-      : `单方程 ${proposal.equation || '—'}`
-  return (
-    <div className="mt-2 rounded-xl border border-sky-200 bg-sky-50/80 p-3 text-slate-800">
-      <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">拟定拟合方案</p>
-      <p className="mt-1 text-sm">{mode}</p>
-      <dl className="mt-2 space-y-1 text-xs text-slate-600">
-        <div>
-          <span className="text-slate-400">映射：</span>x={proposal.xSpec || '—'}, y={proposal.ySpec || '—'}
-        </div>
-        <div>
-          <span className="text-slate-400">来源：</span>
-          {proposal.pointSource || 'AUTO'}
-          {proposal.csvNameHint ? `（${proposal.csvNameHint}）` : ''}
-        </div>
-        {proposal.timeToMinutes ? (
-          <div>
-            <span className="text-slate-400">时间：</span>转换为相对分钟（最早为 0）
-          </div>
-        ) : null}
-        {(proposal.recordCodes || []).length > 0 && (
-          <div>
-            <span className="text-slate-400">记录：</span>
-            {proposal.recordCodes.join(', ')}
-          </div>
-        )}
-        {(proposal.statuses || []).length > 0 && (
-          <div>
-            <span className="text-slate-400">状态：</span>
-            {proposal.statuses.join(', ')}
-          </div>
-        )}
-      </dl>
-      {proposal.rationale && <p className="mt-2 text-xs text-slate-600">{proposal.rationale}</p>}
-      <div className="mt-3">
-        <Button loading={confirming} disabled={confirming} onClick={onConfirm}>
-          确认拟合
-        </Button>
-      </div>
-    </div>
-  )
-}
-
 function AnalysisTemplateCard({ template }) {
   if (!template) return null
   return (
@@ -206,12 +147,11 @@ function AnalysisTemplateCard({ template }) {
   )
 }
 
-export default function ProjectChatPanel({ project, variant = 'embedded' }) {
+export default function ProjectChatPanel({ project, variant = 'embedded', initialMessages = null, onAutoSave }) {
   const [messages, setMessages] = useState([])
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
-  const [pendingProposal, setPendingProposal] = useState(null)
   const [references, setReferences] = useState([])
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(null)
@@ -221,27 +161,26 @@ export default function ProjectChatPanel({ project, variant = 'embedded' }) {
   const tall = variant === 'page'
 
   useEffect(() => {
-    setMessages([])
+    setMessages(initialMessages || [])
     setDraft('')
     setError('')
-    setPendingProposal(null)
     setReferences([])
     setUploading(false)
     setUploadProgress(null)
-  }, [project.id])
+  }, [project.id, initialMessages])
 
   useEffect(() => {
     if (typeof bottomRef.current?.scrollIntoView === 'function') {
       bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     }
-  }, [messages, sending, pendingProposal, references])
+  }, [messages, sending, references])
 
-  const sendPayload = async (text, fitConfirm = null, keepReferences = false) => {
+  const sendPayload = async (text) => {
     const message = (text || '').trim() || (references.length > 0 ? '请参考我关联的文件。' : '')
     if (!message || sending) return
     setSending(true)
     setError('')
-    if (!fitConfirm) setDraft('')
+    setDraft('')
     const history = trimChatHistory(messages)
     const referenceIds = references.map((item) => item.id)
     const attachedNames = references.map((item) => item.filename)
@@ -256,7 +195,6 @@ export default function ProjectChatPanel({ project, variant = 'embedded' }) {
     ])
     try {
       const body = { message, history }
-      if (fitConfirm) body.fitConfirm = fitConfirm
       if (referenceIds.length > 0) body.referenceIds = referenceIds
       const result = await sendProjectAgentChat(project.id, body)
       const fits = Array.isArray(result.fits) && result.fits.length > 0
@@ -269,23 +207,20 @@ export default function ProjectChatPanel({ project, variant = 'embedded' }) {
         {
           role: 'assistant',
           content: result.reply,
+          systemError: result.systemError || null,
           fit: result.fit || null,
           fits,
-          proposal: result.proposal || null,
-          analysisTemplate: result.analysisTemplate || null,
           chart: result.chart || null,
         },
       ])
-      if (result.proposal) {
-        setPendingProposal(result.proposal)
-      } else if (fits.length > 0) {
-        setPendingProposal(null)
+      if (onAutoSave) {
+        const savedMessages = [...messages, { role: 'user', content: message }, { role: 'assistant', content: result.reply }]
+        onAutoSave(savedMessages.filter((m) => m.role === 'user' || m.role === 'assistant'))
       }
-      if (!keepReferences) setReferences([])
     } catch (requestError) {
       setError(agentErrorMessage(requestError))
       setMessages((current) => current.slice(0, -1))
-      if (!fitConfirm) setDraft(text)
+      setDraft(text)
     } finally {
       setSending(false)
     }
@@ -294,15 +229,7 @@ export default function ProjectChatPanel({ project, variant = 'embedded' }) {
   const send = async () => {
     const text = draft.trim()
     if (!text && references.length === 0) return
-    if (isConfirmPhrase(text) && pendingProposal) {
-      await sendPayload(text, pendingProposal, true)
-      return
-    }
     await sendPayload(text)
-  }
-
-  const confirmProposal = async (proposal) => {
-    await sendPayload('确认按拟定方案拟合', proposal || pendingProposal, true)
   }
 
   const onPickFile = async (event) => {
@@ -344,6 +271,7 @@ export default function ProjectChatPanel({ project, variant = 'embedded' }) {
   }
 
   return (
+    <>
     <Surface
       title="项目问答"
       extra={
@@ -358,7 +286,6 @@ export default function ProjectChatPanel({ project, variant = 'embedded' }) {
         </button>
       }
     >
-      <AgentHelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
       <div
         className={`space-y-3 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3 ${
           tall ? 'max-h-[min(70vh,40rem)] min-h-[22rem]' : 'max-h-80'
@@ -375,22 +302,28 @@ export default function ProjectChatPanel({ project, variant = 'embedded' }) {
             className={`flex ${item.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm ${
+              className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
                 item.role === 'user'
-                  ? 'bg-brand-600 text-white'
+                  ? 'bg-brand-600 text-white whitespace-pre-wrap'
                   : 'border border-slate-200 bg-white text-slate-800'
               }`}
             >
-              {item.content}
+              {item.role === 'assistant' && item.systemError ? (
+                <div className="mb-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                  <p className="mb-1 font-semibold">文件读取失败</p>
+                  <p className="whitespace-pre-wrap text-xs">{item.systemError}</p>
+                  <p className="mt-2 text-xs text-red-600">
+                    请删除此附件并在对应记录中重新上传文件。
+                  </p>
+                </div>
+              ) : null}
+              {item.role === 'user' ? (
+                item.content
+              ) : (
+                <div dangerouslySetInnerHTML={{ __html: renderMarkdown(item.content) }} />
+              )}
               {item.role === 'assistant' && item.analysisTemplate ? (
                 <AnalysisTemplateCard template={item.analysisTemplate} />
-              ) : null}
-              {item.role === 'assistant' && item.proposal ? (
-                <FitProposalCard
-                  proposal={item.proposal}
-                  confirming={sending}
-                  onConfirm={() => confirmProposal(item.proposal)}
-                />
               ) : null}
               {item.role === 'assistant' && Array.isArray(item.fits) && item.fits.length > 0
                 ? item.fits.map((fit, fitIndex) => (
@@ -405,16 +338,6 @@ export default function ProjectChatPanel({ project, variant = 'embedded' }) {
             </div>
           </div>
         ))}
-        {pendingProposal && !messages.some((item) => item.proposal === pendingProposal) ? (
-          <div className="rounded-xl border border-sky-200 bg-white p-3">
-            <p className="text-xs text-slate-500">待确认方案仍有效，可点击下方按钮或发送「确认拟合」。</p>
-            <FitProposalCard
-              proposal={pendingProposal}
-              confirming={sending}
-              onConfirm={() => confirmProposal(pendingProposal)}
-            />
-          </div>
-        ) : null}
         {sending && <p className="text-sm text-slate-400">AI 正在回复…</p>}
         <div ref={bottomRef} />
       </div>
@@ -479,5 +402,7 @@ export default function ProjectChatPanel({ project, variant = 'embedded' }) {
         </Button>
       </div>
     </Surface>
+    <AgentHelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
+    </>
   )
 }

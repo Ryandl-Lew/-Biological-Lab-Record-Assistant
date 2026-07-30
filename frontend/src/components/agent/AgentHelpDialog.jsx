@@ -1,4 +1,5 @@
 import { X } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui'
 
 const SECTIONS = [
@@ -57,7 +58,7 @@ const SECTIONS = [
 
 export default function AgentHelpDialog({ open, onClose }) {
   if (!open) return null
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
       role="presentation"
@@ -67,7 +68,7 @@ export default function AgentHelpDialog({ open, onClose }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="agent-help-title"
-        className="max-h-[88vh] w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-pop"
+        className="max-h-[88vh] w-full max-w-xl overflow-hidden rounded-2xl bg-white/95 shadow-pop backdrop-blur-sm"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
@@ -104,6 +105,7 @@ export default function AgentHelpDialog({ open, onClose }) {
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

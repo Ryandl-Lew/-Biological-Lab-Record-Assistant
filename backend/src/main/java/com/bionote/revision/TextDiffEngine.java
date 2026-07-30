@@ -11,7 +11,7 @@ public class TextDiffEngine {
         String left = before == null ? "" : before, right = after == null ? "" : after;
         if (left.equals(right)) return new Result(List.of(new RevisionDtos.TextOperation("EQUAL", left)), false);
         String[] a = tokens(left), b = tokens(right);
-        if ((long) a.length * b.length > 500_000L || a.length > 1500 || b.length > 1500) {
+        if ((long) a.length * b.length > 100_000L || a.length > 700 || b.length > 700) {
             return coarse(left, right, maxOperations, true);
         }
         int[][] lcs = new int[a.length + 1][b.length + 1];

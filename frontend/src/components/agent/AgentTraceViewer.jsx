@@ -17,7 +17,7 @@ export default function AgentTraceViewer({ run, open, onClose }) {
   const shown = useMemo(() => steps.slice(0, visible), [steps, visible])
   if (!open || !run) return null
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-label="Agent 运行轨迹">
-    <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+    <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white/95 p-6 shadow-2xl backdrop-blur-sm">
       <div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-lg font-semibold">运行轨迹</h2><p className="mt-1 break-all text-xs text-slate-400">Run {run.id}</p></div><Button variant="secondary" onClick={onClose}>关闭</Button></div>
       <dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{[['状态', run.status], ['触发方式', run.triggerType], ['模型', `${run.provider} / ${run.model}`], ['Token', `${run.inputTokens} in / ${run.outputTokens} out`]].map(([label, value]) => <div key={label} className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-400">{label}</dt><dd className="mt-1 text-sm font-medium">{value}</dd></div>)}</dl>
       <p className="mt-4 rounded-lg bg-blue-50 p-3 text-xs text-blue-800">Replay 仅逐步展开已保存的脱敏步骤，不会重新调用模型或工具，也不展示隐藏推理。</p>

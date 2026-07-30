@@ -69,5 +69,8 @@ public final class AgentDtos {
     public record ChartPointView(double x, double y, String label){}
     public record ChartSeriesView(String name, List<ChartPointView> points){}
     public record ChartView(String type, String title, String xLabel, String yLabel, List<ChartSeriesView> series){}
-    public record ChatReply(String reply,String provider,String model,FitView fit,List<FitView> fits,FitProposalView proposal,AnalysisTemplateView analysisTemplate,ChartView chart){}
+    public record ChatReply(String reply,String provider,String model,FitView fit,List<FitView> fits,FitProposalView proposal,AnalysisTemplateView analysisTemplate,ChartView chart,String systemError){}
+    public record ChatSessionSummary(UUID id, String title, Instant createdAt, Instant updatedAt, int messageCount) {}
+    public record ChatSessionDetail(UUID id, UUID projectId, UUID recordId, String title, List<ChatMessage> messages, Instant createdAt, Instant updatedAt) {}
+    public record SaveSessionRequest(String title, List<ChatMessage> messages) {}
 }

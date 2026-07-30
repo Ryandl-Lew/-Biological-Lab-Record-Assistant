@@ -81,7 +81,7 @@ public final class AnalysisTemplateCatalog {
         }
         if (looksLikeAnalysisRequest(message) && (text.contains("实验总结") || text.contains("western")
                 || text.contains("blot") || text.contains("pcr") || text.contains("总结这个实验")
-                || text.contains("分析这个实验") || text.contains("实验分析"))) {
+                || text.contains("总结") || text.contains("分析这个实验") || text.contains("实验分析"))) {
             return byId("experiment_summary");
         }
         if (looksLikeAnalysisRequest(message) && (text.contains("项目进展") || text.contains("项目状态")

@@ -78,6 +78,17 @@ public class AgentChatReferenceService implements AgentChatReferenceUseCase {
         storage.deleteQuietly(key);
     }
 
+    /** Read the raw bytes and filename of a chat reference for tool processing (plot/fit). */
+    public ChatReferenceFile readReferenceFile(UUID actor, UUID projectId, UUID referenceId) {
+        requireMember(actor, projectId);
+        AgentChatReferenceStore.ChatReference ref = references.findActive(referenceId, projectId, Instant.now())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "参考文件不存在或已过期"));
+        byte[] bytes = storage.read(ref.storageKey());
+        return new ChatReferenceFile(ref.originalFilename(), ref.contentType(), bytes);
+    }
+
+    public record ChatReferenceFile(String filename, String contentType, byte[] bytes) {}
+
     public String formatForContext(UUID actor, UUID projectId, List<UUID> referenceIds) {
         if (referenceIds == null || referenceIds.isEmpty()) return "";
         if (referenceIds.size() > MAX_REFS_PER_REQUEST) {
@@ -87,7 +98,7 @@ public class AgentChatReferenceService implements AgentChatReferenceUseCase {
         requireMember(actor, projectId);
         StringBuilder text = new StringBuilder();
         text.append("CHAT_FILE_REFERENCES:\n");
-        text.append("These are temporary chat uploads (not experiment-record attachments). Use them as read-only evidence.\n");
+        text.append("These are temporary chat uploads (not experiment-record attachments). Read the content below directly.\n\n");
         int used = 0;
         for (UUID referenceId : referenceIds) {
             if (referenceId == null) continue;
@@ -102,10 +113,38 @@ public class AgentChatReferenceService implements AgentChatReferenceUseCase {
             }
             Map<String, Object> row = rows.get(0);
             used++;
-            text.append("- file=\"").append(row.get("original_filename")).append('"')
-                    .append(" type=").append(row.get("content_type"))
-                    .append(" size=").append(row.get("size_bytes")).append('\n');
-            text.append("  peek=").append(row.get("peek_json")).append('\n');
+            String filename = String.valueOf(row.get("original_filename"));
+            String contentType = String.valueOf(row.get("content_type"));
+            text.append("--- BEGIN FILE: ").append(filename).append(" (")
+                    .append(contentType).append(", ")
+                    .append(row.get("size_bytes")).append(" bytes, ")
+                    .append("referenceId=").append(referenceId)
+                    .append(") ---\n");
+            // Parse peek JSON and output clean content
+            try {
+                Map<?,?> peek = json.readValue(String.valueOf(row.get("peek_json")), Map.class);
+                String textPreview = peek.get("textPreview") != null ? String.valueOf(peek.get("textPreview")) : null;
+                if (textPreview != null && !textPreview.isBlank()) {
+                    text.append(textPreview);
+                    if (!textPreview.endsWith("\n")) text.append('\n');
+                } else {
+                    @SuppressWarnings("unchecked")
+                    List<String> columns = peek.get("columns") instanceof List ? (List<String>) peek.get("columns") : List.of();
+                    String note = peek.get("note") != null ? String.valueOf(peek.get("note")) : null;
+                    if (!columns.isEmpty()) {
+                        text.append("Columns: ").append(String.join(", ", columns)).append('\n');
+                    }
+                    if (note != null) {
+                        text.append("Note: ").append(note).append('\n');
+                    }
+                    if (textPreview == null && columns.isEmpty()) {
+                        text.append("(This file type cannot be read as text. Refer to the filename and user's description.)\n");
+                    }
+                }
+            } catch (Exception e) {
+                text.append("(Could not parse file preview)\n");
+            }
+            text.append("--- END FILE: ").append(filename).append(" ---\n\n");
         }
         if (used == 0) return "";
         return text.toString();
@@ -122,7 +161,26 @@ public class AgentChatReferenceService implements AgentChatReferenceUseCase {
                 String sample = new String(bytes, 0, Math.min(bytes.length, MAX_TEXT_PREVIEW), StandardCharsets.UTF_8);
                 peek.put("textPreview", sample);
             } else {
-                peek.put("note", "Excel first-sheet headers only; full binary not inlined.");
+                // Extract data rows from Excel, up to 500 rows
+                try {
+                    List<String[]> rows = extractor.readXlsxRows(bytes);
+                    StringBuilder sb = new StringBuilder();
+                    if (!headers.isEmpty()) {
+                        sb.append(String.join(",", headers)).append('\n');
+                    }
+                    int dataStart = headers.isEmpty() || !rows.isEmpty() && rows.get(0).length > 0 ? 
+                            (headers.isEmpty() ? -1 : 0) : 0;
+                    int rowCount = 0;
+                    for (int i = Math.max(0, dataStart); i < rows.size() && rowCount < 500; i++) {
+                        String[] row = rows.get(i);
+                        if (row.length == 0) continue;
+                        sb.append(String.join(",", row)).append('\n');
+                        rowCount++;
+                    }
+                    peek.put("textPreview", sb.toString());
+                } catch (Exception e) {
+                    peek.put("note", "Excel headers extracted but data rows could not be read.");
+                }
             }
         } else if (lower.endsWith(".txt") || lower.endsWith(".md")
                 || (contentType != null && contentType.startsWith("text/"))) {

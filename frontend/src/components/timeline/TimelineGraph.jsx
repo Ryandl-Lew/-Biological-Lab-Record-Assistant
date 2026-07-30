@@ -23,7 +23,7 @@ function filterEvents(allEvents, filters) {
 }
 
 export default function TimelineGraph({
-  events, labels, icons, members, onNavigateRecord, emptyMessage = '暂无协作事件',
+  events, labels, icons, members, onViewDetail, emptyMessage = '暂无协作事件',
 }) {
   const [filters, setFilters] = useState({ eventType: '', actorId: '', from: '', to: '' })
   const setFilter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }))
@@ -186,7 +186,7 @@ export default function TimelineGraph({
                     className={`flex items-center overflow-hidden px-4 py-2 ${dimmed ? 'opacity-15' : ''}`}
                     style={{ height: ROW_HEIGHT }}
                   >
-                    <div className={`flex w-full max-w-4xl gap-3 rounded-xl border border-slate-200 bg-white py-2.5 px-4 transition hover:border-brand-200 hover:bg-slate-50`}>
+                    <div className={`flex w-full max-w-4xl gap-3 rounded-xl border border-slate-200/60 bg-white/85 py-2.5 px-4 backdrop-blur-sm transition hover:border-brand-200 hover:bg-slate-50`}>
                       {Icon
                         ? <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs ${node.color.light}`} style={{ color: node.color.stroke }}><Icon size={16} /></span>
                         : <span className="h-8 w-8 shrink-0" />}
@@ -204,7 +204,7 @@ export default function TimelineGraph({
                           <button
                             type="button"
                             className="rounded-lg px-2.5 py-1 text-xs text-brand-600 transition hover:bg-brand-50"
-                            onClick={() => onNavigateRecord(node.recordId)}
+                            onClick={() => onViewDetail(node)}
                           >
                             查看
                           </button>

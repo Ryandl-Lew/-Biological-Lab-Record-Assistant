@@ -65,7 +65,6 @@ public class AgentRunService implements AgentRunUseCase {
     @Override @Transactional
     public AgentDtos.RunView createRecord(UUID actor,UUID recordId,AgentDtos.CreateRunRequest request,String key) {
         requireEnabled();RecordStore.RecordData record=record(recordId,actor);
-        if(!actor.equals(record.creatorId()))throw new ApiException(HttpStatus.FORBIDDEN,"ACCESS_DENIED","Only the record creator can generate a summary");
         if(!"RECORD_SUMMARY".equals(request.artifactKind()))throw invalid("artifactKind must be RECORD_SUMMARY");
         return create(actor,"RECORD_SUMMARY","RECORD",recordId,record.projectId(),recordId,record.createdAt(),
                 Instant.now(),request.focus(),key,null,"MANUAL");
@@ -73,8 +72,7 @@ public class AgentRunService implements AgentRunUseCase {
 
     @Override @Transactional
     public AgentDtos.RunView createProject(UUID actor,UUID projectId,AgentDtos.CreateRunRequest request,String key) {
-        requireEnabled();String role=member(projectId,actor);
-        if(!"OWNER".equals(role))throw new ApiException(HttpStatus.FORBIDDEN,"ACCESS_DENIED","Only project owners can generate project progress reports");
+        requireEnabled();member(projectId,actor);
         if(!"PROJECT_PROGRESS".equals(request.artifactKind()))throw invalid("artifactKind must be PROJECT_PROGRESS");
         Instant end=request.periodEnd()==null?Instant.now():request.periodEnd();
         Instant start=request.periodStart()==null?end.minus(Duration.ofDays(7)):request.periodStart();
@@ -109,11 +107,10 @@ public class AgentRunService implements AgentRunUseCase {
                 instant(request.path("periodEnd").asText(null)),request.path("focus").asText(null));
         if("RECORD".equals(old.subjectType())) {
             RecordStore.RecordData record=record(old.recordId(),actor);
-            if(!actor.equals(record.creatorId()))throw new ApiException(HttpStatus.FORBIDDEN,"ACCESS_DENIED","Only the record creator can rerun this summary");
             return create(actor,old.artifactKind(),old.subjectType(),old.subjectId(),old.projectId(),old.recordId(),
                     value.periodStart(),value.periodEnd(),value.focus(),key,old.id(),"RERUN");
         }
-        if(!"OWNER".equals(member(old.projectId(),actor)))throw new ApiException(HttpStatus.FORBIDDEN,"ACCESS_DENIED","Only project owners can rerun progress reports");
+        member(old.projectId(),actor);
         return create(actor,old.artifactKind(),old.subjectType(),old.subjectId(),old.projectId(),null,
                 value.periodStart(),value.periodEnd(),value.focus(),key,old.id(),"RERUN");
     }

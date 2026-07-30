@@ -11,14 +11,14 @@
     "get_latest_project_report"
   ],
   "maxCallsByTool": {
-    "get_project_overview": 2,
+    "get_project_overview": 3,
     "list_project_records": 5,
-    "get_record_overview": 10,
+    "get_record_overview": 20,
     "list_record_revisions": 10,
     "get_revision_summary": 10,
     "compare_record_revisions": 6,
     "list_review_feedback": 10,
     "list_project_activity": 5,
-    "get_latest_project_report": 1
+    "get_latest_project_report": 2
   }
 }

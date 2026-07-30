@@ -1,30 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { FlaskConical, Microscope, Zap } from 'lucide-react'
-import { sendRecordAgentChat } from '@/api/agentChat'
+import { History, MessageSquarePlus, Trash2 } from 'lucide-react'
+import { sendRecordAgentChat, listRecordSessions, getSession, saveRecordSession, appendSessionMessages, deleteSession } from '@/api/agentChat'
 import { Button, Surface } from '@/components/ui'
+import { renderMarkdown } from '@/lib/renderMarkdown'
 import { agentErrorMessage } from './messages'
-
-/** Quick-start suggestion chips for common record analysis scenarios. */
-const QUICK_STARTS = [
-  {
-    label: '总结这个实验',
-    icon: Microscope,
-    prompt: '帮我总结这个实验，包括实验目的、材料、步骤、结果、异常分析和改进建议。',
-    color: 'hover:bg-brand-50 hover:text-brand-700 hover:border-brand-300',
-  },
-  {
-    label: '分析实验步骤',
-    icon: FlaskConical,
-    prompt: '请帮我分析这个实验记录的步骤是否完整，有什么可以改进的地方？',
-    color: 'hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300',
-  },
-  {
-    label: '快速摘要',
-    icon: Zap,
-    prompt: '用一段话简要总结这个实验记录做了什么、结果如何。',
-    color: 'hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300',
-  },
-]
 
 function AnalysisTemplateCard({ template }) {
   if (!template) return null
@@ -49,20 +28,20 @@ function AnalysisTemplateCard({ template }) {
   )
 }
 
-export default function RecordChatPanel({ record }) {
+export default function RecordChatPanel({ record, initialMessages, onAutoSave, onNewChat }) {
   const [messages, setMessages] = useState([])
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
-  const [showQuickStart, setShowQuickStart] = useState(true)
+  const [showHistory, setShowHistory] = useState(false)
+  const [sessions, setSessions] = useState([])
   const bottomRef = useRef(null)
 
   useEffect(() => {
-    setMessages([])
+    setMessages(initialMessages || [])
     setDraft('')
     setError('')
-    setShowQuickStart(true)
-  }, [record.id])
+  }, [record.id, initialMessages])
 
   useEffect(() => {
     if (typeof bottomRef.current?.scrollIntoView === 'function') {
@@ -83,12 +62,12 @@ export default function RecordChatPanel({ record }) {
       const result = await sendRecordAgentChat(record.id, { message, history })
       setMessages((current) => [
         ...current,
-        {
-          role: 'assistant',
-          content: result.reply,
-          analysisTemplate: result.analysisTemplate || null,
-        },
+        { role: 'assistant', content: result.reply, analysisTemplate: result.analysisTemplate || null },
       ])
+      if (onAutoSave) {
+        const savedMessages = [...messages, { role: 'user', content: message }, { role: 'assistant', content: result.reply }]
+        onAutoSave(savedMessages.filter((m) => m.role === 'user' || m.role === 'assistant'))
+      }
     } catch (requestError) {
       setError(agentErrorMessage(requestError))
       setMessages((current) => current.slice(0, -1))
@@ -98,9 +77,40 @@ export default function RecordChatPanel({ record }) {
     }
   }
 
-  const onQuickStart = (prompt) => {
-    setDraft(prompt)
-    send(prompt)
+  const handleLoadSessions = async () => {
+    try {
+      const result = await listRecordSessions(record.id)
+      setSessions(result)
+      setShowHistory(!showHistory)
+    } catch (e) {}
+  }
+
+  const handleLoadSession = async (sessionId) => {
+    try {
+      const detail = await getSession(sessionId)
+      setMessages(detail.messages)
+      setShowHistory(false)
+      setShowQuickStart(false)
+    } catch (e) {
+      setError(e.message || '加载失败')
+    }
+  }
+
+  const handleDeleteSession = async (sessionId) => {
+    try {
+      await deleteSession(sessionId)
+      const result = await listRecordSessions(record.id)
+      setSessions(result)
+    } catch (e) {
+      setError(e.message || '删除失败')
+    }
+  }
+
+  const handleNewChat = () => {
+    setMessages([])
+    setShowHistory(false)
+    setShowQuickStart(true)
+    if (onNewChat) onNewChat()
   }
 
   const onKeyDown = (event) => {
@@ -111,35 +121,40 @@ export default function RecordChatPanel({ record }) {
   }
 
   return (
-    <Surface title="记录问答">
-      <p className="text-sm text-slate-500">
-        基于当前实验条目的只读上下文问答（含版本历史与审核意见），
-        支持结构化分析模板；不会修改记录数据，刷新页面后对话会清空。
-      </p>
-
-      {/* Quick-start suggestion chips */}
-      {showQuickStart && messages.length === 0 && !sending && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {QUICK_STARTS.map((item) => {
-            const Icon = item.icon
-            return (
-              <button
-                key={item.label}
-                type="button"
-                disabled={sending}
-                onClick={() => onQuickStart(item.prompt)}
-                className={`inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors disabled:opacity-50 ${item.color}`}
-              >
-                <Icon size={14} />
-                {item.label}
-              </button>
-            )
-          })}
+    <Surface title="记录问答" extra={
+      <div className="flex items-center gap-2">
+        <Button variant="secondary" size="sm" icon={MessageSquarePlus} onClick={handleNewChat}>新对话</Button>
+        <Button variant="secondary" size="sm" icon={History} onClick={handleLoadSessions}>对话历史</Button>
+      </div>
+    }>
+      {showHistory && (
+        <div className="mb-4 rounded-xl border border-slate-200 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-slate-900">对话历史</h3>
+            <button onClick={() => setShowHistory(false)} className="text-xs text-slate-400 hover:text-slate-600">关闭</button>
+          </div>
+          {sessions.length === 0 ? (
+            <p className="py-4 text-center text-sm text-slate-400">暂无保存的对话</p>
+          ) : (
+            <div className="divide-y">
+              {sessions.map((s) => (
+                <div key={s.id} className="flex items-center justify-between py-2">
+                  <button onClick={() => handleLoadSession(s.id)} className="flex-1 text-left">
+                    <p className="truncate text-sm font-medium text-slate-900">{s.title}</p>
+                    <p className="mt-0.5 text-xs text-slate-400">
+                      {s.messageCount} 条消息 · {new Date(s.updatedAt).toLocaleString()}
+                    </p>
+                  </button>
+                  <Button variant="danger" size="sm" icon={Trash2} onClick={() => handleDeleteSession(s.id)} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* Chat messages */}
-      <div className="mt-4 max-h-80 space-y-3 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <div className="mt-4 max-h-[65vh] min-h-[24rem] space-y-3 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3">
         {messages.length === 0 && !sending && (
           <p className="py-6 text-center text-sm text-slate-400">
             可以向 AI 询问这条记录的状态、目的或字段含义；
@@ -152,13 +167,17 @@ export default function RecordChatPanel({ record }) {
             className={`flex ${item.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm ${
+              className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
                 item.role === 'user'
-                  ? 'bg-brand-600 text-white'
+                  ? 'bg-brand-600 text-white whitespace-pre-wrap'
                   : 'border border-slate-200 bg-white text-slate-800'
               }`}
             >
-              {item.content}
+              {item.role === 'user' ? (
+                item.content
+              ) : (
+                <div dangerouslySetInnerHTML={{ __html: renderMarkdown(item.content) }} />
+              )}
               {item.role === 'assistant' && item.analysisTemplate ? (
                 <AnalysisTemplateCard template={item.analysisTemplate} />
               ) : null}

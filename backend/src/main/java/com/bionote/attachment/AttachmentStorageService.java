@@ -51,7 +51,7 @@ public class AttachmentStorageService implements AttachmentStorage {
         } catch (IOException e) {
             throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "FILE_STORAGE_FAILED", "附件保存失败");
         }
-        return new StoredFile(key, name, canonicalType(ext), bytes.length, Set.of("jpg", "jpeg", "png", "webp", "pdf", "md").contains(ext));
+        return new StoredFile(key, name, canonicalType(ext), bytes.length, Set.of("jpg", "jpeg", "png", "webp", "pdf", "md", "csv").contains(ext));
     }
 
     public byte[] read(String key) {

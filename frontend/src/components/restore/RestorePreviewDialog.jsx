@@ -31,7 +31,7 @@ export default function RestorePreviewDialog({ record, revision, open, onClose, 
   }
   const stale = error?.code === 'RESTORE_PREVIEW_STALE' || error?.code === 'OPTIMISTIC_LOCK_CONFLICT'
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-label="恢复预览">
-    <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+    <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white/95 p-6 shadow-2xl backdrop-blur-sm">
       <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold">恢复 {revision.label || `R${revision.revisionNo}`} 为工作副本</h2><p className="mt-1 text-sm text-slate-500">历史版本不会删除或修改；下次提交才会生成新的 Rn。</p></div><Button ref={closeRef} variant="secondary" disabled={executing} onClick={onClose}>关闭</Button></div>
       <label className="mt-5 flex items-center gap-2 text-sm"><input type="checkbox" checked={restoreAttachments} disabled={loading || executing} onChange={(event) => changeAttachments(event.target.checked)} />同时恢复附件状态（切换会重新生成预览）</label>
       {loading && <p role="status" className="py-12 text-center text-slate-400">正在生成恢复预览…</p>}

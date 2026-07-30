@@ -1,14 +1,18 @@
 package com.bionote.agent.api;
 
-import com.bionote.agent.analysis.AnalysisTemplateCatalog;
 import com.bionote.agent.config.AgentCredentialService;
 import com.bionote.agent.config.AgentCredentials;
 import com.bionote.agent.config.AgentProperties;
 import com.bionote.agent.fit.ChartPlotService;
+import com.bionote.agent.fit.CurveFitEngine;
 import com.bionote.agent.fit.CurveFitService;
+import com.bionote.agent.fit.ExpressionParser;
 import com.bionote.agent.fit.FitMethodCatalog;
 import com.bionote.agent.fit.FitModels;
 import com.bionote.agent.fit.FitProposalResolver;
+import com.bionote.agent.tool.AgentToolContext;
+import com.bionote.agent.tool.AgentToolRegistry;
+import com.bionote.agent.tool.bionote.BioNoteAgentReadService;
 import com.bionote.common.ApiException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,20 +28,26 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.net.http.HttpClient;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 public class RecordChatService implements AgentChatUseCase {
     private static final String RECORD_SYSTEM = """
             You are BioNote's read-only assistant for one experiment record.
-            Answer only from the provided record context and chat history.
-            If facts are missing, say you do not know. Never invent experimental outcomes, reviews, or revision numbers.
+            Answer from the provided record context, chat history, and available tools.
+            Available tools:
+            - `list_record_attachments(recordId)`: list all attachments for this record
+            - `read_attachment_content(attachmentId, recordId?)`: read full text of a text attachment (CSV/TXT/MD)
+            When the user asks about file contents, call `read_attachment_content` with the attachment ID (the `id=` field from the attachments list).
+            If facts are missing or tools return errors, say you do not know. Never invent experimental outcomes, reviews, or revision numbers.
             Never claim you modified the record, reviews, attachments, or membership.
             Never output email addresses, secrets, storage paths, or hidden reasoning.
             Reply in the user's language. Keep answers concise and practical.
@@ -45,20 +55,13 @@ public class RecordChatService implements AgentChatUseCase {
 
     private static final String PROJECT_SYSTEM = """
             You are BioNote's read-only assistant for one collaboration project.
-            Answer only from the provided project context and chat history.
-            If facts are missing, say you do not know. Never invent experimental outcomes, reviews, or member emails.
-            COMPLETED means workflow completion, not experimental success.
-            Never claim you modified projects, records, reviews, attachments, or membership.
-            When CHAT_FILE_REFERENCES is provided, treat those temporary uploads as user-supplied evidence for this turn only; they are not experiment-record attachments.
-            Never invent fit parameters; when FIT_RESULT / FIT_RESULTS are provided, explain those numbers only.
-            When FIT_PROPOSAL is provided, summarize the proposed data range and method and ask the user to confirm before fitting. Always keep the structured proposal; the UI shows a confirm button.
-            When FIT_DATA_CATALOG lists file="..." columns=[...], those ARE the Excel/CSV headers — answer column questions from them; never say you cannot see attachment columns.
-            NEVER invent regression coefficients, R², or RMSE when FIT_RESULT is absent. If no FIT_RESULT is provided, do not claim fitting was executed.
-            When CHART is provided, describe that verified chart briefly; never invent series values beyond CHART.
-            When ANALYSIS_TEMPLATE is provided, follow its systemAddendum and outputSections; kinetic equations are interpretive only — never invent ODE parameters.
-            ANALYSIS_TEMPLATE_CATALOG lists reusable analysis frameworks available in this product.
-            Never output email addresses, secrets, storage paths, or hidden reasoning.
-            Reply in the user's language. Keep answers concise and practical.
+            Use the provided tools to explore data, read files, plot charts, and fit curves.
+            Available tools: list_project_attachments, list_record_attachments(recordId), read_attachment_content(filename),
+            plot_chart(chartType,xColumn,yColumn,referenceId?), fit_data(xColumn,yColumn,equation?,autoCompare?,referenceId?).
+            IMPORTANT: For chat-uploaded files (shown as CHAT_FILE_REFERENCES with --- BEGIN FILE --- markers),
+            always pass the referenceId from the marker to plot_chart/fit_data. Example: fit_data(xColumn="time",yColumn="od",referenceId="abc-123").
+            For fit_data: read the file first to see column names. If the user does not specify xColumn/yColumn, ask them to clarify.
+            NEVER invent numbers, parameters, or outcomes. Reply concisely in the user's language.
             """;
 
     private static final Logger log = LoggerFactory.getLogger(RecordChatService.class);
@@ -70,10 +73,14 @@ public class RecordChatService implements AgentChatUseCase {
     private final FitProposalResolver proposals;
     private final AgentChatReferenceService chatReferences;
     private final ChartPlotService charts;
+    private final BioNoteAgentReadService agentReads;
+    private final AgentToolRegistry toolRegistry;
+    private final ChatSessionStore sessions;
 
     public RecordChatService(AgentProperties properties, AgentCredentialService credentials, AgentChatContextStore contextStore,
                              ObjectMapper json, CurveFitService curveFits, FitProposalResolver proposals,
-                             AgentChatReferenceService chatReferences, ChartPlotService charts) {
+                             AgentChatReferenceService chatReferences, ChartPlotService charts,
+                             BioNoteAgentReadService agentReads, AgentToolRegistry toolRegistry, ChatSessionStore sessions) {
         this.properties = properties;
         this.credentials = credentials;
         this.contextStore = contextStore;
@@ -82,101 +89,19 @@ public class RecordChatService implements AgentChatUseCase {
         this.proposals = proposals;
         this.chatReferences = chatReferences;
         this.charts = charts;
+        this.agentReads = agentReads;
+        this.toolRegistry = toolRegistry;
+        this.sessions = sessions;
     }
-
     public AgentDtos.ChatReply chat(UUID actor, UUID recordId, AgentDtos.ChatRequest request) {
         requireEnabled();
         Map<String, Object> record = requireVisibleRecord(actor, recordId);
         ParsedChat parsed = parseRequest(request);
         String context = buildRecordContext(record);
 
-        // Resolve analysis template from user message
-        AnalysisTemplateCatalog.Template analysisTemplate =
-                AnalysisTemplateCatalog.resolveFromMessage(parsed.message());
-        String systemPrompt = RECORD_SYSTEM;
-        String contextLabel = "RECORD_CONTEXT";
-
-        if (analysisTemplate != null) {
-            systemPrompt = systemPrompt + "\n" + analysisTemplate.systemAddendum();
-            AgentDtos.AnalysisTemplateView templateView = toAnalysisTemplateView(analysisTemplate);
-            context = context + "\n\nANALYSIS_TEMPLATE:\n" + write(templateView)
-                    + "\nOUTPUT_SECTIONS: " + String.join("；", analysisTemplate.outputSections());
-            // Enrich context with revision and review data for deeper analysis
-            context = enrichRecordContextForAnalysis(context, recordId);
-            AgentCredentials creds = credentials.resolve(actor);
-            AgentDtos.ChatReply fake = fakeAnalysisRecordReply(record, analysisTemplate, parsed.message(), creds);
-            return complete(creds, systemPrompt, contextLabel, context, parsed, fake,
-                    null, null, null, templateView, null);
-        }
-
         AgentCredentials creds = credentials.resolve(actor);
-        return complete(creds, systemPrompt, contextLabel, context, parsed,
-                fakeRecordReply(record, parsed.message(), creds), null, null, null, null, null);
-    }
-
-    /** Enrich record context with recent revision and review summaries for analysis. */
-    private String enrichRecordContextForAnalysis(String context, UUID recordId) {
-        StringBuilder extra = new StringBuilder();
-        try {
-            List<Map<String,Object>> revisions=contextStore.recentRevisions(recordId);
-            if (!revisions.isEmpty()) {
-                extra.append("\nRECENT_REVISIONS:\n");
-                for (Map<String, Object> rev : revisions) {
-                    extra.append("- R").append(rev.get("revision_no"))
-                          .append(" by ").append(rev.get("submitter"))
-                          .append(": ").append(limit(String.valueOf(rev.get("submit_note")), 200))
-                          .append("\n");
-                }
-            }
-            List<Map<String,Object>> reviews=contextStore.recentReviews(recordId);
-            if (!reviews.isEmpty()) {
-                extra.append("\nRECENT_REVIEWS:\n");
-                for (Map<String, Object> rv : reviews) {
-                    extra.append("- ").append(rv.get("status"))
-                          .append(" by ").append(rv.get("reviewer"))
-                          .append(": ").append(limit(String.valueOf(rv.get("decision_comment")), 300))
-                          .append("\n");
-                }
-            }
-            List<Map<String,Object>> attachments=contextStore.activeAttachments(recordId);
-            if (!attachments.isEmpty()) {
-                extra.append("\nATTACHMENTS:\n");
-                for (Map<String, Object> att : attachments) {
-                    extra.append("- ").append(att.get("original_filename"))
-                          .append(" (").append(att.get("content_type"))
-                          .append(", ").append(formatBytes(att.get("size_bytes"))).append(")\n");
-                }
-            }
-        } catch (Exception ignored) {
-            // enrichment is best-effort
-        }
-        return context + extra.toString();
-    }
-
-    private String formatBytes(Object size) {
-        if (size == null) return "?";
-        long bytes = ((Number) size).longValue();
-        if (bytes < 1024) return bytes + " B";
-        if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
-        return String.format("%.1f MB", bytes / (1024.0 * 1024.0));
-    }
-
-    private AgentDtos.ChatReply fakeAnalysisRecordReply(Map<String, Object> record,
-                                                         AnalysisTemplateCatalog.Template template,
-                                                         String message, AgentCredentials creds) {
-        String code = String.valueOf(record.get("code"));
-        String title = String.valueOf(record.get("title"));
-        String sections = String.join("；", template.outputSections());
-        return new AgentDtos.ChatReply(
-                "【本地 fake 回复】已读取记录 " + code + "《" + title + "》，"
-                        + "启用分析模板「" + template.label() + "」（id=" + template.id() + "）。"
-                        + "当前状态为 " + record.get("status") + "。"
-                        + "输出章节：" + sections + "。"
-                        + "真实模型未启用时仅返回确定性演示答复。",
-                "fake",
-                displayModel(creds),
-                null, null, null,
-                toAnalysisTemplateView(template), null);
+        return complete(creds, RECORD_SYSTEM, "RECORD_CONTEXT", context, parsed,
+                fakeRecordReply(record, parsed.message(), creds), null, null, null, null, null, actor, null, recordId);
     }
 
     public AgentDtos.ChatReply chatAboutProject(UUID actor, UUID projectId, AgentDtos.ChatRequest request) {
@@ -187,8 +112,7 @@ public class RecordChatService implements AgentChatUseCase {
         List<FitModels.CatalogRecord> catalog = curveFits.buildFitCatalog(projectId);
         String catalogText = curveFits.formatFitCatalog(catalog);
         context = context + "\n\nFIT_DATA_CATALOG:\n" + catalogText
-                + "\nEQUATION_CATALOG:\n" + FitMethodCatalog.catalogDescription()
-                + "\nANALYSIS_TEMPLATE_CATALOG:\n" + AnalysisTemplateCatalog.catalogDescription();
+                + "\nEQUATION_CATALOG:\n" + FitMethodCatalog.catalogDescription();
         String referenceContext = chatReferences.formatForContext(actor, projectId, request.referenceIds());
         if (referenceContext != null && !referenceContext.isBlank()) {
             context = context + "\n\n" + referenceContext;
@@ -198,67 +122,10 @@ public class RecordChatService implements AgentChatUseCase {
             return executeConfirmedFit(actor, projectId, project, parsed, context, request.fitConfirm());
         }
 
-        AnalysisTemplateCatalog.Template analysisTemplate = AnalysisTemplateCatalog.resolveFromMessage(parsed.message());
-        boolean preferAnalysis = analysisTemplate != null
-                || AnalysisTemplateCatalog.looksLikeAnalysisRequest(parsed.message());
-        if (preferAnalysis && analysisTemplate == null) {
-            analysisTemplate = AnalysisTemplateCatalog.byId("process_kinetics_proxy");
-        }
-
         AgentCredentials creds = credentials.resolve(actor);
 
-        // Curve-fit proposal path (skip when user primarily asks for template analysis report).
-        if (!preferAnalysis && (curveFits.looksLikeFitRequest(parsed.message()) || isConfirmPhrase(parsed.message()))) {
-            if (isConfirmPhrase(parsed.message()) && request.fitConfirm() == null) {
-                return new AgentDtos.ChatReply(
-                        "请点击方案卡片上的「确认拟合」按钮（不要只打「确认」）。若按钮未出现，请重新描述拟合需求以生成结构化方案。",
-                        displayProvider(creds), displayModel(creds), null, null, null, null, null);
-            }
-            FitModels.FitIntent seed = curveFits.parseIntent(parsed.message());
-            String historyHint = recentUserHints(parsed.history());
-            String resolveMessage = historyHint.isEmpty() ? parsed.message() : historyHint + "\n" + parsed.message();
-            FitModels.FitProposal proposal = proposals.resolve(resolveMessage, catalogText, seed, creds);
-            if (proposal.missingPrompt() != null) {
-                return new AgentDtos.ChatReply(proposal.missingPrompt(), displayProvider(creds), displayModel(creds), null, null, null, null, null);
-            }
-            AgentDtos.FitProposalView proposalView = toProposalView(proposal);
-            String proposalContext = "\n\nFIT_PROPOSAL:\n" + write(proposalView);
-            AgentDtos.ChatReply fake = fakeProposalReply(project, proposalView, creds);
-            return complete(creds, PROJECT_SYSTEM, "PROJECT_CONTEXT", context + proposalContext, parsed, fake,
-                    null, null, proposalView, null, null);
-        }
-
-        if (!preferAnalysis && charts.shouldHandleChart(parsed.message(), parsed.history())) {
-            String historyHint = recentUserHints(parsed.history());
-            String resolveMessage = historyHint.isEmpty() ? parsed.message() : historyHint + "\n" + parsed.message();
-            try {
-                AgentDtos.ChartView chart = charts.plot(actor, projectId, resolveMessage, catalogText, creds);
-                int n = chart.series() == null || chart.series().isEmpty() || chart.series().get(0).points() == null
-                        ? 0 : chart.series().get(0).points().size();
-                String reply = "已根据表格数据生成「" + chart.title() + "」（" + n + " 个点）。"
-                        + "下图数值来自 Excel/CSV 抽取，未由模型编造。";
-                // Skip the free-form LLM turn so it cannot invent markdown placeholder images.
-                return new AgentDtos.ChatReply(reply, displayProvider(creds), displayModel(creds),
-                        null, null, null, null, chart);
-            } catch (ApiException e) {
-                String message = e.getMessage() == null ? "无法生成数据图" : e.getMessage();
-                return new AgentDtos.ChatReply(message, displayProvider(creds), displayModel(creds),
-                        null, null, null, null, null);
-            }
-        }
-
-        if (preferAnalysis && analysisTemplate != null) {
-            AgentDtos.AnalysisTemplateView templateView = toAnalysisTemplateView(analysisTemplate);
-            String analysisContext = "\n\nANALYSIS_TEMPLATE:\n" + write(templateView)
-                    + "\nANALYSIS_TEMPLATE_RULES:\n" + analysisTemplate.systemAddendum();
-            AgentDtos.ChatReply fake = fakeAnalysisReply(project, templateView, creds);
-            return complete(creds, PROJECT_SYSTEM + "\n" + analysisTemplate.systemAddendum(),
-                    "PROJECT_CONTEXT", context + analysisContext, parsed, fake,
-                    null, null, null, templateView, null);
-        }
-
         AgentDtos.ChatReply fake = fakeProjectReply(project, parsed.message(), null, creds);
-        return complete(creds, PROJECT_SYSTEM, "PROJECT_CONTEXT", context, parsed, fake, null, null, null, null, null);
+        return complete(creds, PROJECT_SYSTEM, "PROJECT_CONTEXT", context, parsed, fake, null, null, null, null, null, actor, projectId, null);
     }
 
     private AgentDtos.ChatReply executeConfirmedFit(UUID actor, UUID projectId, Map<String, Object> project,
@@ -273,13 +140,13 @@ public class RecordChatService implements AgentChatUseCase {
             String fitContext = "\n\nFIT_RESULTS:\n" + write(fitViews)
                     + (chart == null ? "" : "\n\nCHART:\n" + write(chart));
             AgentDtos.ChatReply fake = fakeProjectReply(project, parsed.message(), primary, fitViews, creds);
-            return complete(creds, PROJECT_SYSTEM, "PROJECT_CONTEXT", context + fitContext, parsed, fake, primary, fitViews, null, null, chart);
+            return complete(creds, PROJECT_SYSTEM, "PROJECT_CONTEXT", context + fitContext, parsed, fake, primary, fitViews, null, null, chart, actor, projectId, null);
         } catch (ApiException e) {
             String message = e.getMessage() == null ? "拟合失败" : e.getMessage();
             if ("invalid number".equalsIgnoreCase(message) || message.toLowerCase(Locale.ROOT).contains("invalid number")) {
                 message = "数据或方程无法解析为数值。若时间列为时刻，请说明“转换为分钟”；多元回归请用列名列表而非 y=a+b1*x1+... 省略式。";
             }
-            return new AgentDtos.ChatReply(message, displayProvider(creds), displayModel(creds), null, null, null, null, null);
+            return new AgentDtos.ChatReply(message, displayProvider(creds), displayModel(creds), null, null, null, null, null, null);
         }
     }
 
@@ -287,13 +154,21 @@ public class RecordChatService implements AgentChatUseCase {
                                         ParsedChat parsed, AgentDtos.ChatReply fakeReply, AgentDtos.FitView fit,
                                         List<AgentDtos.FitView> fits, AgentDtos.FitProposalView proposal,
                                         AgentDtos.AnalysisTemplateView analysisTemplate, AgentDtos.ChartView chart) {
+        return complete(creds, system, contextLabel, context, parsed, fakeReply, fit, fits, proposal, analysisTemplate, chart, null, null, null);
+    }
+
+    private AgentDtos.ChatReply complete(AgentCredentials creds, String system, String contextLabel, String context,
+                                        ParsedChat parsed, AgentDtos.ChatReply fakeReply, AgentDtos.FitView fit,
+                                        List<AgentDtos.FitView> fits, AgentDtos.FitProposalView proposal,
+                                        AgentDtos.AnalysisTemplateView analysisTemplate, AgentDtos.ChartView chart,
+                                        UUID actor, UUID projectId, UUID recordId) {
         String provider = displayProvider(creds);
         String model = displayModel(creds);
         if ("fake".equalsIgnoreCase(provider)) {
             if (fit != null || proposal != null || analysisTemplate != null || chart != null
                     || (fits != null && !fits.isEmpty())) {
                 return new AgentDtos.ChatReply(fakeReply.reply(), fakeReply.provider(), fakeReply.model(),
-                        fit, fits, proposal, analysisTemplate, chart);
+                        fit, fits, proposal, analysisTemplate, chart, null);
             }
             return fakeReply;
         }
@@ -301,8 +176,13 @@ public class RecordChatService implements AgentChatUseCase {
             throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "MODEL_PROVIDER_UNAVAILABLE",
                     "llm 配置不完整，请检查 base_url (OpenAI)、api_key 和 model");
         }
-        String reply = completeOpenAiCompatible(creds, system, contextLabel, context, parsed.history(), parsed.message(), model);
-        return new AgentDtos.ChatReply(reply, provider, model, fit, fits, proposal, analysisTemplate, chart);
+        var result = completeOpenAiCompatible(creds, system, contextLabel, context, parsed.history(), parsed.message(), model, actor, projectId, recordId);
+        return new AgentDtos.ChatReply(result.reply, provider, model,
+                result.fit != null ? result.fit : fit,
+                result.fits != null ? result.fits : fits,
+                proposal, analysisTemplate,
+                result.chart != null ? result.chart : chart,
+                result.systemError);
     }
 
     private ParsedChat parseRequest(AgentDtos.ChatRequest request) {
@@ -320,6 +200,7 @@ public class RecordChatService implements AgentChatUseCase {
                         + "。当前状态为 " + record.get("status") + "。真实模型未启用时仅返回确定性演示答复。",
                 "fake",
                 displayModel(creds),
+                null,
                 null,
                 null,
                 null,
@@ -345,7 +226,7 @@ public class RecordChatService implements AgentChatUseCase {
                 + (Boolean.TRUE.equals(proposal.timeToMinutes()) ? "；时间列将转换为相对分钟" : "")
                 + "。" + (proposal.rationale() == null ? "" : proposal.rationale())
                 + " 点击「确认拟合」继续。";
-        return new AgentDtos.ChatReply(reply, "fake", displayModel(creds), null, null, proposal, null, null);
+        return new AgentDtos.ChatReply(reply, "fake", displayModel(creds), null, null, proposal, null, null, null);
     }
 
     private AgentDtos.ChatReply fakeChartReply(Map<String, Object> project, AgentDtos.ChartView chart,
@@ -354,30 +235,11 @@ public class RecordChatService implements AgentChatUseCase {
                 ? 0 : chart.series().get(0).points().size();
         String reply = "【本地 fake 回复】已根据项目《" + project.get("name") + "》中的真实数据生成"
                 + chart.title() + "（" + n + " 个数据点）。图表由抽取引擎计算，未由模型编造数值。";
-        return new AgentDtos.ChatReply(reply, "fake", displayModel(creds), null, null, null, null, chart);
-    }
-
-    private AgentDtos.ChatReply fakeAnalysisReply(Map<String, Object> project, AgentDtos.AnalysisTemplateView template,
-                                                 AgentCredentials creds) {
-        StringBuilder reply = new StringBuilder();
-        reply.append("【本地 fake 回复】已启用通用分析模板「").append(template.label()).append("」（id=")
-                .append(template.id()).append("），用于项目《").append(project.get("name")).append("》。\n");
-        reply.append(template.description()).append('\n');
-        reply.append("请按下列章节组织结论；动力学方程仅为解释框架，不会求解 ODE，也不会编造 μ_max/Ks 等参数。\n");
-        reply.append("建议章节：").append(String.join("；", template.outputSections())).append('\n');
-        if (template.suggestedFits() != null && !template.suggestedFits().isEmpty()) {
-            reply.append("建议先做证据拟合：");
-            for (AgentDtos.SuggestedEvidenceFitView fit : template.suggestedFits()) {
-                reply.append(fit.purpose()).append("(x=").append(fit.xHint()).append(", y=").append(fit.yHint()).append(")；");
-            }
-            reply.append('\n');
-        }
-        reply.append("缺测项请写入分析边界：").append(String.join("、", template.uncertaintyChecklist()));
-        return new AgentDtos.ChatReply(reply.toString(), "fake", displayModel(creds), null, null, null, template, null);
+        return new AgentDtos.ChatReply(reply, "fake", displayModel(creds), null, null, null, null, chart, null);
     }
 
     private AgentDtos.ChatReply fakeProjectReply(Map<String, Object> project, String message, AgentDtos.FitView fit,
-                                                AgentCredentials creds) {
+                                                 AgentCredentials creds) {
         return fakeProjectReply(project, message, fit, fit == null ? null : List.of(fit), creds);
     }
 
@@ -396,21 +258,7 @@ public class RecordChatService implements AgentChatUseCase {
             reply = "【本地 fake 回复】我已读取项目《" + project.get("name") + "》。你问的是：" + limit(message, 200)
                     + "。项目状态为 " + project.get("status") + "。真实模型未启用时仅返回确定性演示答复。";
         }
-        return new AgentDtos.ChatReply(reply, "fake", displayModel(creds), fit, fits, null, null, charts.fromFit(fit));
-    }
-
-    private AgentDtos.AnalysisTemplateView toAnalysisTemplateView(AnalysisTemplateCatalog.Template template) {
-        List<AgentDtos.SuggestedEvidenceFitView> suggested = template.suggestedFits().stream()
-                .map(s -> new AgentDtos.SuggestedEvidenceFitView(s.purpose(), s.xHint(), s.yHint(), s.note()))
-                .toList();
-        return new AgentDtos.AnalysisTemplateView(
-                template.id(),
-                template.label(),
-                template.description(),
-                template.outputSections(),
-                template.uncertaintyChecklist(),
-                suggested
-        );
+        return new AgentDtos.ChatReply(reply, "fake", displayModel(creds), fit, fits, null, null, charts.fromFit(fit), null);
     }
 
     private AgentDtos.FitView toFitView(FitModels.FitResult result) {
@@ -533,50 +381,288 @@ public class RecordChatService implements AgentChatUseCase {
         }
     }
 
-    private String completeOpenAiCompatible(AgentCredentials creds, String system, String contextLabel, String context,
-                                            List<AgentDtos.ChatMessage> history, String message, String model) {
+    private CompletionResult completeOpenAiCompatible(AgentCredentials creds, String system, String contextLabel, String context,
+                                            List<AgentDtos.ChatMessage> history, String message, String model,
+                                            UUID actor, UUID projectId, UUID recordId) {
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", system + "\n\n" + contextLabel + ":\n" + context));
         for (AgentDtos.ChatMessage item : history) {
             messages.add(Map.of("role", item.role(), "content", item.content()));
         }
         messages.add(Map.of("role", "user", "content", message));
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", model);
-        body.put("messages", messages);
-        body.put("temperature", 0);
-        body.put("max_tokens", Math.max(256, Math.min(4000, properties.getMaxOutputTokens())));
-        if (model.toLowerCase().startsWith("deepseek")) body.put("thinking", Map.of("type", "disabled"));
-        RestClient client = restClientFor(creds);
-        try {
-            JsonNode root = client.post()
-                    .uri("chat/completions")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + creds.apiKey())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(body)
-                    .retrieve()
-                    .body(JsonNode.class);
-            String content = contentText(root == null ? null : root.path("choices").path(0).path("message").path("content"));
+        boolean hasTools = actor != null && projectId != null;
+        String toolError = null;
+        AgentDtos.ChartView chartResult = null;
+        AgentDtos.FitView fitResult = null;
+        List<AgentDtos.FitView> fitsResults = null;
+        for (int turn = 0; turn < 3; turn++) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("model", model);
+            body.put("messages", messages);
+            body.put("temperature", 0);
+            body.put("max_tokens", Math.max(256, Math.min(4000, properties.getMaxOutputTokens())));
+            if (hasTools) {
+                body.put("tools", chatToolDefinitions());
+                body.put("tool_choice", "auto");
+            }
+            if (model.toLowerCase().startsWith("deepseek")) body.put("thinking", Map.of("type", "disabled"));
+            log.debug("LLM chat request: model={} messages={} tools={}", model, messages.size(), hasTools ? 2 : 0);
+            if (log.isTraceEnabled()) { try { log.trace("LLM chat request body: {}", json.writeValueAsString(body)); } catch (Exception ignored) {} }
+            RestClient client = restClientFor(creds);
+            JsonNode root;
+            try {
+                root = client.post()
+                        .uri("chat/completions")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + creds.apiKey())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(body)
+                        .retrieve()
+                        .body(JsonNode.class);
+            } catch (ApiException e) { throw e; }
+            catch (RestClientResponseException e) {
+                int status = e.getStatusCode().value();
+                String code = status == 429 ? "AGENT_RATE_LIMITED"
+                        : status == 401 || status == 403 || status >= 500 ? "MODEL_PROVIDER_UNAVAILABLE"
+                        : "MODEL_PROVIDER_ERROR";
+                String detail = status == 401 || status == 403
+                        ? "llm 中的 API Key 无效或权限不足（HTTP " + status + "）"
+                        : "Model provider request failed with status " + status;
+                throw new ApiException(status == 429 ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.BAD_GATEWAY, code, detail);
+            } catch (ResourceAccessException e) {
+                throw new ApiException(HttpStatus.GATEWAY_TIMEOUT, "AGENT_TIMEOUT", "Model provider timed out");
+            } catch (Exception e) {
+                throw new ApiException(HttpStatus.BAD_GATEWAY, "MODEL_PROVIDER_ERROR",
+                        "Model provider response could not be processed: " + e.getMessage());
+            }
+            JsonNode usage = root.path("usage");
+            log.debug("LLM chat response: prompt_tokens={} completion_tokens={}", usage.path("prompt_tokens").asLong(0), usage.path("completion_tokens").asLong(0));
+            if (log.isTraceEnabled()) { try { log.trace("LLM chat response body: {}", json.writeValueAsString(root)); } catch (Exception ignored) {} }
+
+            JsonNode choice = root.path("choices").path(0).path("message");
+            JsonNode toolCalls = choice.path("tool_calls");
+            if (toolCalls.isArray() && toolCalls.size() > 0 && hasTools) {
+                messages.add(Map.of("role", "assistant", "tool_calls", toolCallMessages(toolCalls), "content", ""));
+                for (JsonNode call : toolCalls) {
+                    String toolName = call.path("function").path("name").asText();
+                    String toolId = call.path("id").asText();
+                    String result = executeChatTool(toolName, call.path("function").path("arguments"), actor, projectId, recordId);
+                    if ("plot_chart".equals(toolName) && result.startsWith("CHART:")) {
+                        try { chartResult = json.readValue(result.substring(6), AgentDtos.ChartView.class); } catch (Exception ignored) {}
+                        result = "图表已生成。";
+                    }
+                    if ("fit_data".equals(toolName) && result.startsWith("FIT:")) {
+                        try {
+                            @SuppressWarnings("unchecked")
+                            List<AgentDtos.FitView> fits = json.readValue(result.substring(4), json.getTypeFactory().constructCollectionType(List.class, AgentDtos.FitView.class));
+                            fitsResults = fits;
+                            fitResult = fits.isEmpty() ? null : fits.get(0);
+                        } catch (Exception ignored) {}
+                        result = "拟合已完成。";
+                    }
+                    if (result.startsWith("错误:") || result.startsWith("拟合执行失败:") || result.startsWith("未找到可用于")) {
+                        if (toolError != null) {
+                            return new CompletionResult(result, toolError, chartResult, fitResult, fitsResults);
+                        }
+                        toolError = result;
+                    }
+                    messages.add(Map.of("role", "tool", "tool_call_id", toolId, "content", result));
+                }
+                continue;
+            }
+
+            String content = contentText(choice.path("content"));
             if (content == null || content.isBlank()) {
                 throw new ApiException(HttpStatus.BAD_GATEWAY, "MODEL_PROVIDER_ERROR", "Model returned empty chat content");
             }
-            return content.trim();
+            return new CompletionResult(content.trim(), toolError, chartResult, fitResult, fitsResults);
+        }
+        throw new ApiException(HttpStatus.BAD_GATEWAY, "MODEL_PROVIDER_ERROR", "Model exceeded tool-call limit");
+    }
+
+    private record CompletionResult(String reply, String systemError, AgentDtos.ChartView chart, AgentDtos.FitView fit, List<AgentDtos.FitView> fits) {
+        CompletionResult(String reply, String systemError) { this(reply, systemError, null, null, null); }
+    }
+
+    private static final Set<String> CHAT_TOOL_NAMES = Set.of("list_project_attachments", "list_record_attachments", "read_attachment_content", "plot_chart", "fit_data");
+    private static final int TOOL_CONTENT_MAX_CHARS = 4000;
+
+    private List<Map<String, Object>> chatToolDefinitions() {
+        return toolRegistry.definitions().stream()
+            .filter(d -> CHAT_TOOL_NAMES.contains(d.name()))
+            .map(d -> Map.of("type", "function", "function", Map.of(
+                "name", d.name(),
+                "description", d.description(),
+                "parameters", convertSchema(d.inputSchema())
+            ))).toList();
+    }
+
+    private JsonNode convertSchema(JsonNode schema) { return schema; }
+
+    private JsonNode safeParseArgs(String text) {
+        if (text == null || text.isBlank()) return json.createObjectNode();
+        try { return json.readTree(text); }
+        catch (Exception e) { return json.createObjectNode(); }
+    }
+
+    private List<Map<String, Object>> toolCallMessages(JsonNode toolCalls) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (JsonNode call : toolCalls) {
+            JsonNode argsNode = call.path("function").path("arguments");
+            String argsStr = argsNode.isTextual() ? argsNode.asText() : argsNode.toString();
+            result.add(Map.of(
+                "id", call.path("id").asText(),
+                "type", "function",
+                "function", Map.of(
+                    "name", call.path("function").path("name").asText(),
+                    "arguments", argsStr
+                )
+            ));
+        }
+        return result;
+    }
+
+    private String executeChatTool(String name, JsonNode rawArgs, UUID actor, UUID projectId, UUID recordId) {
+        try {
+            AgentToolContext ctx = new AgentToolContext(
+                UUID.randomUUID(), actor, projectId, recordId != null ? recordId : projectId,
+                recordId != null ? "RECORD" : "PROJECT", recordId != null ? recordId : projectId,
+                null, null, () -> false
+            );
+            // OpenAI may return function.arguments as a JSON string; normalize to ObjectNode
+            JsonNode args = rawArgs.isTextual() ? safeParseArgs(rawArgs.asText()) : rawArgs;
+            if ("list_project_attachments".equals(name)) {
+                var payload = agentReads.listProjectAttachments(ctx);
+                return json.writeValueAsString(payload.data().get("data"));
+            }
+            if ("list_record_attachments".equals(name)) {
+                UUID recId = UUID.fromString(args.path("recordId").asText());
+                var payload = agentReads.listAttachments(ctx, recId);
+                return json.writeValueAsString(payload.data().get("data"));
+            }
+            if ("read_attachment_content".equals(name)) {
+                log.info("read_attachment_content args: {}", args.toString());
+                JsonNode fileNode = args.path("filename");
+                String rawId = fileNode.isMissingNode() ? args.path("attachmentId").asText() : fileNode.asText();
+                UUID attachmentId;
+                try {
+                    attachmentId = UUID.fromString(rawId);
+                } catch (IllegalArgumentException e) {
+                    // LLM passed a filename instead of UUID — search by exact filename
+                    if (rawId.isBlank()) {
+                        return "未提供文件名。请先调用 list_project_attachments 获取文件列表。";
+                    }
+                    var listPayload = agentReads.listProjectAttachments(ctx);
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> attachments = (List<Map<String, Object>>) listPayload.data().get("data");
+                    Map<String, Object> matched = null;
+                    String search = rawId.trim();
+                    for (Map<String, Object> row : attachments) {
+                        String fname = String.valueOf(row.get("original_filename"));
+                        if (fname.equals(search) || fname.endsWith(search) || search.endsWith(fname)) {
+                            matched = row;
+                            break;
+                        }
+                    }
+                    if (matched == null) {
+                        log.warn("read_attachment_content: no filename match for '{}' among {} attachments", rawId, attachments.size());
+                        return "未找到文件 '" + rawId + "'，请确认文件名与列表中的一致。";
+                    }
+                    attachmentId = UUID.fromString(String.valueOf(matched.get("id")));
+                    log.info("read_attachment_content: resolved filename '{}' to attachmentId={}", rawId, attachmentId);
+                }
+                UUID recId = args.has("recordId") && !args.path("recordId").isNull() ? UUID.fromString(args.path("recordId").asText()) : recordId;
+                var payload = agentReads.readAttachmentContent(ctx, attachmentId, recId);
+                Map<String, Object> data = (Map<String, Object>) payload.data().get("data");
+                String content = String.valueOf(data.get("content"));
+                if (content.length() > TOOL_CONTENT_MAX_CHARS) {
+                    content = content.substring(0, TOOL_CONTENT_MAX_CHARS) + "\n...(内容过长，已截断)";
+                }
+                StringBuilder sb = new StringBuilder();
+                sb.append("文件: ").append(data.get("filename")).append("\n");
+                sb.append("类型: ").append(data.get("mediaType")).append("\n");
+                sb.append("内容:\n").append(content);
+                return sb.toString();
+            }
+            if ("plot_chart".equals(name)) {
+                String chartType = args.path("chartType").asText("line");
+                String xColumn = args.path("xColumn").asText();
+                String yColumn = args.path("yColumn").asText();
+                String csvHint = args.path("csvFilename").asText(null);
+                UUID refId = args.has("referenceId") && !args.path("referenceId").isNull() ? UUID.fromString(args.path("referenceId").asText()) : null;
+                if (xColumn.isBlank() || yColumn.isBlank()) {
+                    return "请提供 xColumn 和 yColumn 参数，例如 xColumn=时间 yColumn=残糖。";
+                }
+                List<FitModels.DataPoint> points;
+                if (refId != null) {
+                    AgentChatReferenceService.ChatReferenceFile ref = chatReferences.readReferenceFile(actor, projectId, refId);
+                    points = curveFits.extractFromChatReference(ref.bytes(), ref.filename(), xColumn, yColumn);
+                } else {
+                    FitModels.FitProposal proposal = new FitModels.FitProposal(true, "y=a+b*x", false, List.of(),
+                            xColumn, yColumn, "CSV_ATTACHMENT", csvHint, List.of(), List.of(), null, null, null, null,
+                            false, false);
+                    try {
+                        points = curveFits.extractPlotPoints(actor, projectId, proposal);
+                    } catch (ApiException e) {
+                        return "未找到可用于绘图的数据。请确认列名 '" + xColumn + "' 和 '" + yColumn + "' 在 CSV/记录字段中存在。也可通过 referenceId 参数指定已上传的聊天文件。";
+                    }
+                }
+                if (points.isEmpty()) {
+                    return "未找到可用于绘图的数据。请确认列名正确，或使用 referenceId 参数指定已上传的聊天临时文件。";
+                }
+                if (points.size() > 200) points = new ArrayList<>(points.subList(0, 200));
+                List<AgentDtos.ChartPointView> chartPoints = new ArrayList<>();
+                for (FitModels.DataPoint p : points) {
+                    chartPoints.add(new AgentDtos.ChartPointView(p.x(), p.y(), p.recordCode()));
+                }
+                String title = ("bar".equals(chartType) ? "柱状图" : "scatter".equals(chartType) ? "散点图" : "折线图")
+                        + "：" + yColumn + " vs " + xColumn;
+                AgentDtos.ChartView chart = new AgentDtos.ChartView(chartType, title, xColumn, yColumn,
+                        List.of(new AgentDtos.ChartSeriesView(yColumn, chartPoints)));
+                try { return "CHART:" + json.writeValueAsString(chart); } catch (Exception e) { return "图表生成失败: " + e.getMessage(); }
+            }
+            if ("fit_data".equals(name)) {
+                String equation = args.path("equation").asText("y=a+b*x");
+                String xColumn = args.path("xColumn").asText();
+                String yColumn = args.path("yColumn").asText();
+                boolean autoCompare = args.path("autoCompare").asBoolean(false);
+                UUID refId = args.has("referenceId") && !args.path("referenceId").isNull() ? UUID.fromString(args.path("referenceId").asText()) : null;
+                if (xColumn.isBlank() || yColumn.isBlank()) {
+                    return "STOP. 请提供 xColumn 和 yColumn 参数。不要重试。";
+                }
+                List<FitModels.DataPoint> points;
+                FitModels.FitProposal proposal = new FitModels.FitProposal(true, equation, autoCompare, List.of(),
+                        xColumn, yColumn, "CSV_ATTACHMENT", null, List.of(), List.of(), null, null, null, null,
+                        false, false);
+                if (refId != null) {
+                    AgentChatReferenceService.ChatReferenceFile ref = chatReferences.readReferenceFile(actor, projectId, refId);
+                    points = curveFits.extractFromChatReference(ref.bytes(), ref.filename(), xColumn, yColumn);
+                } else {
+                    points = curveFits.extractPlotPoints(actor, projectId, proposal);
+                }
+                if (points.isEmpty()) {
+                    return "未找到可用于拟合的数据点。请确认列名正确。";
+                }
+                try {
+                    List<FitModels.FitResult> results;
+                    if (autoCompare) {
+                        results = curveFits.fitProposalAll(actor, projectId, proposal);
+                    } else {
+                        CurveFitEngine engine = new CurveFitEngine();
+                        FitModels.FitResult result = engine.fit(ExpressionParser.parseEquation(equation), points, List.of());
+                        results = List.of(result);
+                    }
+                    List<AgentDtos.FitView> views = results.stream().map(this::toFitView).toList();
+                    return "FIT:" + json.writeValueAsString(views);
+                } catch (ApiException e) {
+                    return "拟合执行失败: " + e.getMessage();
+                }
+            }
+            return "错误: 未知工具 " + name;
         } catch (ApiException e) {
-            throw e;
-        } catch (RestClientResponseException e) {
-            int status = e.getStatusCode().value();
-            String code = status == 429 ? "AGENT_RATE_LIMITED"
-                    : status == 401 || status == 403 || status >= 500 ? "MODEL_PROVIDER_UNAVAILABLE"
-                    : "MODEL_PROVIDER_ERROR";
-            String detail = status == 401 || status == 403
-                    ? "llm 中的 API Key 无效或权限不足（HTTP " + status + "）"
-                    : "Model provider request failed with status " + status;
-            throw new ApiException(status == 429 ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.BAD_GATEWAY, code, detail);
-        } catch (ResourceAccessException e) {
-            throw new ApiException(HttpStatus.GATEWAY_TIMEOUT, "AGENT_TIMEOUT", "Model provider timed out");
+            return "错误: " + e.getMessage();
         } catch (Exception e) {
-            throw new ApiException(HttpStatus.BAD_GATEWAY, "MODEL_PROVIDER_ERROR",
-                    "Model provider response could not be processed: " + e.getMessage());
+            log.warn("Chat tool execution failed: name={} message={}", name, e.getMessage());
+            return "执行失败，请稍后重试。";
         }
     }
 
@@ -597,9 +683,17 @@ public class RecordChatService implements AgentChatUseCase {
         text.append("experimentDate=").append(record.get("experiment_date")).append('\n');
         text.append("status=").append(record.get("status")).append('\n');
         text.append("currentRevisionNo=").append(record.get("current_revision_no")).append('\n');
-        text.append("purpose=").append(limit(String.valueOf(record.get("purpose")), 1500)).append('\n');
-        text.append("fieldValues=").append(limit(String.valueOf(record.get("field_values_json")), 2500)).append('\n');
-        text.append("contentPlainText=").append(limit(String.valueOf(record.get("content_plain_text")), 3000)).append('\n');
+        text.append("purpose=").append(limit(String.valueOf(record.get("purpose")), 1000)).append('\n');
+        text.append("fieldValues=").append(limit(String.valueOf(record.get("field_values_json")), 2000)).append('\n');
+        text.append("contentPlainText=").append(limit(String.valueOf(record.get("content_plain_text")), 2000)).append('\n');
+        List<Map<String,Object>> attachments=contextStore.activeAttachments(UUID.fromString(record.get("id").toString()));
+        if (!attachments.isEmpty()) {
+            text.append("attachments:\n");
+            for (Map<String, Object> att : attachments) {
+                text.append("- id=").append(att.get("id")).append(" ").append(att.get("original_filename"))
+                        .append(" (").append(att.get("media_type")).append(", ").append(att.get("size_bytes")).append(" B)\n");
+            }
+        }
         List<Map<String,Object>> artifacts=contextStore.latestRecordArtifact(UUID.fromString(record.get("id").toString()));
         appendLatestArtifact(text, artifacts);
         return text.toString();
@@ -611,8 +705,8 @@ public class RecordChatService implements AgentChatUseCase {
         text.append("projectId=").append(projectId).append('\n');
         text.append("name=").append(project.get("name")).append('\n');
         text.append("status=").append(project.get("status")).append('\n');
-        text.append("description=").append(limit(String.valueOf(project.get("description")), 1000)).append('\n');
-        text.append("detailedDescription=").append(limit(String.valueOf(project.get("detailed_description")), 2000)).append('\n');
+        text.append("description=").append(limit(String.valueOf(project.get("description")), 500)).append('\n');
+        text.append("detailedDescription=").append(limit(String.valueOf(project.get("detailed_description")), 1000)).append('\n');
         UUID projectUuid=UUID.fromString(projectId);long members=contextStore.memberCount(projectUuid);
         text.append("memberCount=").append(members).append('\n');
         List<Map<String,Object>> roles=contextStore.memberRoleCounts(projectUuid);
@@ -628,6 +722,15 @@ public class RecordChatService implements AgentChatUseCase {
         for (Map<String, Object> row : records) {
             text.append("- ").append(row.get("code")).append(" | ").append(limit(String.valueOf(row.get("title")), 120))
                     .append(" | ").append(row.get("status")).append(" | R").append(row.get("current_revision_no")).append('\n');
+        }
+        List<Map<String,Object>> attachments=contextStore.projectAttachments(projectUuid);
+        if (!attachments.isEmpty()) {
+            text.append("projectAttachments:\n");
+            for (Map<String, Object> att : attachments) {
+                text.append("- id=").append(att.get("id")).append(" ").append(att.get("original_filename"))
+                        .append(" (").append(att.get("media_type")).append(", ").append(att.get("size_bytes"))
+                        .append(" B) [").append(att.get("record_code")).append(" ").append(att.get("record_title")).append("]\n");
+            }
         }
         List<Map<String,Object>> artifacts=contextStore.latestProjectArtifact(projectUuid);
         appendLatestArtifact(text, artifacts);
@@ -705,6 +808,13 @@ public class RecordChatService implements AgentChatUseCase {
         if (value == null || "null".equals(value)) return "";
         return value.length() <= max ? value : value.substring(0, max);
     }
+
+    @Override public List<AgentDtos.ChatSessionSummary> listProjectSessions(UUID actor, UUID projectId) { return sessions.listByProject(actor, projectId); }
+    @Override public List<AgentDtos.ChatSessionSummary> listRecordSessions(UUID actor, UUID recordId) { return sessions.listByRecord(actor, recordId); }
+    @Override public AgentDtos.ChatSessionDetail getSession(UUID actor, UUID sessionId) { return sessions.get(actor, sessionId); }
+    @Override public AgentDtos.ChatSessionDetail saveSession(UUID actor, UUID projectId, UUID recordId, AgentDtos.SaveSessionRequest request) { return sessions.save(actor, projectId, recordId, request); }
+    @Override public AgentDtos.ChatSessionDetail appendSessionMessages(UUID actor, UUID sessionId, List<AgentDtos.ChatMessage> messages) { return sessions.appendMessages(actor, sessionId, messages); }
+    @Override public void deleteSession(UUID actor, UUID sessionId) { sessions.delete(actor, sessionId); }
 
     private record ParsedChat(String message, List<AgentDtos.ChatMessage> history) {}
 }

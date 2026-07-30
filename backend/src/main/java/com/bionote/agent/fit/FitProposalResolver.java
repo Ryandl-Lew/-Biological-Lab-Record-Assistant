@@ -144,6 +144,10 @@ public class FitProposalResolver {
 
     private FitModels.FitProposal resolveFake(String message, String catalogText, FitModels.FitIntent seed) {
         FitModels.FitIntent base = seed != null ? seed : intents.parse(message);
+        if (!base.fitRequested()) {
+            return new FitModels.FitProposal(false, null, false, List.of(), null, null, null, null,
+                    List.of(), List.of(), null, null, null, null, false, false);
+        }
         boolean auto = FitMethodCatalog.wantsAutoCompare(message);
         String equation = base.equation();
         if (!auto) {

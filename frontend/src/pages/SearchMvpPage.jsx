@@ -150,7 +150,7 @@ export default function SearchMvpPage() {
         </div>
 
         {showFilters && (
-          <div className="mt-3 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-card sm:grid-cols-3">
+          <div className="mt-3 grid grid-cols-1 gap-3 rounded-xl border border-slate-200/60 bg-white/85 p-4 shadow-card backdrop-blur-sm sm:grid-cols-3">
             <div><label htmlFor="search-project" className="field-label">项目</label><select id="search-project" value={filters.projectId} onChange={(event) => updateFilter('projectId', event.target.value)} className="input h-10"><option value="">全部项目</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></div>
             <div><label htmlFor="search-creator" className="field-label">记录创建者</label><select id="search-creator" disabled={!filters.projectId} value={filters.creatorId} onChange={(event) => updateFilter('creatorId', event.target.value)} className="input h-10 disabled:bg-slate-50"><option value="">全部成员</option>{members.map((member) => <option key={member.userId} value={member.userId}>{member.displayName}</option>)}</select></div>
             <div><label htmlFor="search-status" className="field-label">记录状态</label><select id="search-status" value={filters.recordStatus} onChange={(event) => updateFilter('recordStatus', event.target.value)} className="input h-10"><option value="">全部状态</option>{Object.entries(RECORD_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
@@ -162,13 +162,13 @@ export default function SearchMvpPage() {
 
         <div className="mt-4 space-y-2.5">
           {loading ? (
-            <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-400">搜索中…</div>
+            <div className="rounded-xl border border-slate-200/60 bg-white/85 p-8 text-center text-sm text-slate-400 backdrop-blur-sm">搜索中…</div>
           ) : result.items.length > 0 ? result.items.map((hit) => {
             const config = ENTITY_CONFIG[hit.entityType]
             const Icon = config?.icon || Paperclip
             const path = targetPath(hit.target)
             return (
-              <button key={`${hit.entityType}-${hit.id}`} type="button" onClick={() => path && navigate(path)} className="flex w-full items-center gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-left shadow-card transition-all hover:border-brand-200 hover:shadow-pop">
+              <button key={`${hit.entityType}-${hit.id}`} type="button" onClick={() => path && navigate(path)} className="flex w-full items-center gap-4 rounded-xl border border-slate-200/60 bg-white/85 px-4 py-3.5 text-left shadow-card backdrop-blur-sm transition-all hover:border-brand-200 hover:shadow-pop">
                 <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${config?.tone || ENTITY_CONFIG.ATTACHMENT.tone}`}><Icon size={17} /></div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2.5"><span className="truncate text-sm font-semibold text-slate-900">{hit.title}</span><Badge tone={SEARCH_ENTITY_TONES[hit.entityType]}>{SEARCH_ENTITY_LABELS[hit.entityType]}</Badge></div>

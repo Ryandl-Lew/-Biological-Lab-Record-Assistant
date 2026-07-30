@@ -57,3 +57,24 @@ export function uploadProjectAgentReference(projectId, file, onProgress = () => 
 
 export const deleteProjectAgentReference = (projectId, referenceId) =>
   request(`/projects/${projectId}/agent-chat/references/${referenceId}`, { method: 'DELETE' })
+
+export const listProjectSessions = (projectId) =>
+  request(`/projects/${projectId}/agent-chat/sessions`)
+
+export const listRecordSessions = (recordId) =>
+  request(`/records/${recordId}/agent-chat/sessions`)
+
+export const getSession = (sessionId) =>
+  request(`/agent-chat/sessions/${sessionId}`)
+
+export const saveProjectSession = (projectId, data) =>
+  request(`/projects/${projectId}/agent-chat/sessions`, { method: 'POST', body: JSON.stringify(data) })
+
+export const saveRecordSession = (recordId, data) =>
+  request(`/records/${recordId}/agent-chat/sessions`, { method: 'POST', body: JSON.stringify(data) })
+
+export const deleteSession = (sessionId) =>
+  request(`/agent-chat/sessions/${sessionId}`, { method: 'DELETE' })
+
+export const appendSessionMessages = (sessionId, messages) =>
+  request(`/agent-chat/sessions/${sessionId}/messages`, { method: 'POST', body: JSON.stringify({ messages }) })

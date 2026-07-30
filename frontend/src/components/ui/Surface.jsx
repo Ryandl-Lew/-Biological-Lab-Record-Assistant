@@ -14,7 +14,7 @@
 export default function Surface({ title, extra, className = '', style, children }) {
   return (
     <section
-      className={`rounded-xl border border-slate-200 bg-white p-5 shadow-card ${className}`.trim()}
+      className={`rounded-xl border border-slate-200/60 bg-white/40 p-5 shadow-card backdrop-blur-sm ${className}`.trim()}
       style={style}
     >
       {(title || extra) && (

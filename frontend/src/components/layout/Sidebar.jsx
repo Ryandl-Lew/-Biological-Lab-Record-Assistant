@@ -49,7 +49,7 @@ export default function Sidebar({ onNavigate }) {
   }
 
   return (
-    <div className="flex h-full flex-col border-r border-slate-200 bg-white">
+    <div className="flex h-full flex-col border-r border-slate-200/60 bg-white/70 backdrop-blur-sm">
       {/* 品牌区 */}
       <div className="flex h-16 items-center gap-3 border-b border-slate-100 px-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-indigo-600 text-white shadow-sm">

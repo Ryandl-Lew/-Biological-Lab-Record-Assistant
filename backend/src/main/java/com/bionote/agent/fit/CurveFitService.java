@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -44,15 +45,6 @@ public class CurveFitService {
 
     public FitModels.FitIntent parseIntent(String message) {
         return intents.parse(message);
-    }
-
-    public boolean looksLikeFitRequest(String message) {
-        if (message == null || message.isBlank()) return false;
-        String text = message.toLowerCase(Locale.ROOT);
-        return message.contains("拟合") || text.contains("fit") || message.contains("标曲")
-                || message.contains("标准曲线") || message.contains("剂量反应") || message.contains("回归")
-                || message.contains("自变量") || message.contains("因变量")
-                || text.contains("curve fit") || text.contains("dose-response");
     }
 
     public List<FitModels.CatalogRecord> buildFitCatalog(UUID projectId) {
@@ -134,6 +126,20 @@ public class CurveFitService {
     }
 
     /** Extract numeric points for charting without running a regression. */
+    /** Parse uploaded chat reference file (CSV/XLSX) into DataPoints for plot/fit tools. */
+    public List<FitModels.DataPoint> extractFromChatReference(byte[] fileBytes, String filename, String xCol, String yCol) {
+        UUID dummyId = UUID.randomUUID();
+        String lower = filename == null ? "" : filename.toLowerCase(Locale.ROOT);
+        try {
+            if (lower.endsWith(".xlsx")) {
+                return extractor.parseXlsx(fileBytes, dummyId, "", xCol, yCol);
+            }
+            return extractor.parseCsv(new String(fileBytes, StandardCharsets.UTF_8), dummyId, "", xCol, yCol);
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
     public List<FitModels.DataPoint> extractPlotPoints(UUID actor, UUID projectId, FitModels.FitProposal proposal) {
         requireMember(actor, projectId);
         if (proposal == null || proposal.xSpec() == null || proposal.ySpec() == null) {

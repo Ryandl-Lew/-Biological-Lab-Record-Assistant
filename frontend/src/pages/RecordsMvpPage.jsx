@@ -52,7 +52,7 @@ export default function RecordsMvpPage() {
   return <section>
     <PageHeader eyebrow="实验记录" title="记录目录" actions={<Button icon={Plus} onClick={() => navigate('/records/new')}>新建记录</Button>}/>
     {error && <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-    <div className="grid min-h-[650px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card lg:grid-cols-[340px,minmax(0,1fr)]">
+    <div className="grid min-h-[650px] overflow-hidden rounded-xl border border-slate-200/60 bg-white/85 shadow-card backdrop-blur-sm lg:grid-cols-[340px,minmax(0,1fr)]">
       <aside className="border-b border-slate-200 bg-slate-50/60 p-4 lg:border-b-0 lg:border-r">
         <div className="relative"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><input aria-label="搜索记录" value={keyword} onChange={(event) => setKeyword(event.target.value)} className="input h-10 bg-white pl-9" placeholder="搜索标题、编号、目的"/></div>
         <select aria-label="记录状态" value={status} onChange={(event) => setStatus(event.target.value)} className="input mt-3 h-10 bg-white"><option value="">全部状态</option><option value="IN_PROGRESS">进行中</option><option value="IN_REVIEW">审核中</option><option value="CHANGES_REQUESTED">需修改</option><option value="COMPLETED">已完成</option></select>

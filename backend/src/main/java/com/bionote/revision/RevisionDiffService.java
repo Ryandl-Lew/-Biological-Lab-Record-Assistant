@@ -26,9 +26,9 @@ public class RevisionDiffService implements RevisionDiffUseCase {
     private final int maxSections;
 
     public RevisionDiffService(SnapshotSourceProvider resolver, TextDiffEngine textDiff,
-            @Value("${revision.diff.max-text-chars:100000}") int maxTextChars,
-            @Value("${revision.diff.max-hunks:500}") int maxHunks,
-            @Value("${revision.diff.max-sections:500}") int maxSections) {
+            @Value("${revision.diff.max-text-chars:30000}") int maxTextChars,
+            @Value("${revision.diff.max-hunks:200}") int maxHunks,
+            @Value("${revision.diff.max-sections:200}") int maxSections) {
         this.resolver = resolver; this.textDiff = textDiff; this.maxTextChars = maxTextChars;
         this.maxHunks = maxHunks; this.maxSections = maxSections;
     }

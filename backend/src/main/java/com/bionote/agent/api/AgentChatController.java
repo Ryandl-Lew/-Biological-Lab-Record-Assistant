@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -66,5 +68,41 @@ public class AgentChatController {
                                       @PathVariable UUID referenceId) {
         references.delete(UUID.fromString(authentication.getName()), projectId, referenceId);
         return ApiResponse.of(null);
+    }
+
+    @GetMapping("/projects/{projectId}/agent-chat/sessions")
+    ApiResponse<List<AgentDtos.ChatSessionSummary>> listProjectSessions(Authentication a, @PathVariable UUID projectId) {
+        return ApiResponse.of(service.listProjectSessions(UUID.fromString(a.getName()), projectId));
+    }
+
+    @GetMapping("/records/{recordId}/agent-chat/sessions")
+    ApiResponse<List<AgentDtos.ChatSessionSummary>> listRecordSessions(Authentication a, @PathVariable UUID recordId) {
+        return ApiResponse.of(service.listRecordSessions(UUID.fromString(a.getName()), recordId));
+    }
+
+    @GetMapping("/agent-chat/sessions/{sessionId}")
+    ApiResponse<AgentDtos.ChatSessionDetail> getSession(Authentication a, @PathVariable UUID sessionId) {
+        return ApiResponse.of(service.getSession(UUID.fromString(a.getName()), sessionId));
+    }
+
+    @PostMapping("/projects/{projectId}/agent-chat/sessions")
+    ApiResponse<AgentDtos.ChatSessionDetail> saveProjectSession(Authentication a, @PathVariable UUID projectId, @Valid @RequestBody AgentDtos.SaveSessionRequest request) {
+        return ApiResponse.of(service.saveSession(UUID.fromString(a.getName()), projectId, null, request));
+    }
+
+    @PostMapping("/records/{recordId}/agent-chat/sessions")
+    ApiResponse<AgentDtos.ChatSessionDetail> saveRecordSession(Authentication a, @PathVariable UUID recordId, @Valid @RequestBody AgentDtos.SaveSessionRequest request) {
+        return ApiResponse.of(service.saveSession(UUID.fromString(a.getName()), null, recordId, request));
+    }
+
+    @DeleteMapping("/agent-chat/sessions/{sessionId}")
+    ApiResponse<Void> deleteSession(Authentication a, @PathVariable UUID sessionId) {
+        service.deleteSession(UUID.fromString(a.getName()), sessionId);
+        return ApiResponse.of(null);
+    }
+
+    @PostMapping("/agent-chat/sessions/{sessionId}/messages")
+    ApiResponse<AgentDtos.ChatSessionDetail> appendMessages(Authentication a, @PathVariable UUID sessionId, @Valid @RequestBody AgentDtos.SaveSessionRequest request) {
+        return ApiResponse.of(service.appendSessionMessages(UUID.fromString(a.getName()), sessionId, request.messages()));
     }
 }

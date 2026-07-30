@@ -272,7 +272,7 @@ public class PointExtractor {
         return null;
     }
 
-    List<FitModels.DataPoint> parseCsv(String text, UUID id, String code, String xSpec, String ySpec) {
+    public List<FitModels.DataPoint> parseCsv(String text, UUID id, String code, String xSpec, String ySpec) {
         return parseCsv(text, id, code, xSpec, ySpec, false);
     }
 
@@ -282,7 +282,7 @@ public class PointExtractor {
         return pointsFromRows(rows, id, code, xSpec, ySpec, "CSV_ATTACHMENT", timeToMinutes);
     }
 
-    List<FitModels.DataPoint> parseXlsx(byte[] bytes, UUID id, String code, String xSpec, String ySpec) {
+    public List<FitModels.DataPoint> parseXlsx(byte[] bytes, UUID id, String code, String xSpec, String ySpec) {
         return parseXlsx(bytes, id, code, xSpec, ySpec, false);
     }
 
@@ -366,6 +366,18 @@ public class PointExtractor {
             List<String> synthetic = new ArrayList<>();
             for (int i = 0; i < first.length; i++) synthetic.add("col" + i);
             return synthetic;
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    /** Read all rows from an XLSX byte array for preview purposes. Best-effort, never throws. */
+    public List<String[]> readXlsxRows(byte[] bytes) {
+        try {
+            try (Workbook workbook = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
+                if (workbook.getNumberOfSheets() <= 0) return List.of();
+                return readSheetRows(workbook.getSheetAt(0));
+            }
         } catch (Exception e) {
             return List.of();
         }
