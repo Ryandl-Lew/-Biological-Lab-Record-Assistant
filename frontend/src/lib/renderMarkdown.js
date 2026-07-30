@@ -1,4 +1,5 @@
 import DOMPurify from 'dompurify'
+import katex from 'katex'
 
 export function renderMarkdown(text) {
   if (!text) return ''
@@ -6,13 +7,37 @@ export function renderMarkdown(text) {
   let html = text
 
   // code blocks (```...```) — must process before inline
+  const codeBlocks = []
   html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_m, lang, code) => {
     const escaped = code
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-    return `<pre class="my-2 overflow-x-auto rounded-lg bg-slate-100 p-3 text-xs"><code>${escaped}</code></pre>`
+    const placeholder = `%%CODEBLOCK_${codeBlocks.length}%%`
+    codeBlocks.push(`<pre class="my-2 overflow-x-auto rounded-lg bg-slate-100 p-3 text-xs"><code>${escaped}</code></pre>`)
+    return placeholder
   })
+
+  // block math $$...$$
+  html = html.replace(/\$\$([\s\S]*?)\$\$/g, (_m, formula) => {
+    try {
+      return katex.renderToString(formula.trim(), { displayMode: true, throwOnError: false })
+    } catch {
+      return `<code>${formula.trim()}</code>`
+    }
+  })
+
+  // inline math $...$ (must not match $$)
+  html = html.replace(/(?<!\$)\$(?!\$)([^$]+)\$(?!\$)/g, (_m, formula) => {
+    try {
+      return katex.renderToString(formula.trim(), { displayMode: false, throwOnError: false })
+    } catch {
+      return `<code>${formula.trim()}</code>`
+    }
+  })
+
+  // restore code blocks
+  html = html.replace(/%%CODEBLOCK_(\d+)%%/g, (_m, idx) => codeBlocks[parseInt(idx)] || '')
 
   // inline code (`...`)
   html = html.replace(/`([^`]+)`/g, '<code class="rounded bg-slate-100 px-1 py-0.5 text-xs font-mono text-rose-600">$1</code>')
@@ -81,5 +106,8 @@ export function renderMarkdown(text) {
     })
     .join('\n')
 
-  return DOMPurify.sanitize(html, { ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'pre', 'code', 'a', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], ALLOWED_ATTR: ['href', 'target', 'rel', 'class'] })
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'pre', 'code', 'a', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'span', 'mrow', 'mfrac', 'msup', 'msub', 'mover', 'munder', 'mo', 'mi', 'mn', 'mtext', 'msqrt', 'mtable', 'mtr', 'mtd', 'annotation'],
+    ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style', 'aria-hidden', 'columnalign', 'columnspacing', 'rowspacing'],
+  })
 }

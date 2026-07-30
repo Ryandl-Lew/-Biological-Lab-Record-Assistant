@@ -1,10 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { CircleHelp, Paperclip, X } from 'lucide-react'
-import {
-  deleteProjectAgentReference,
-  sendProjectAgentChat,
-  uploadProjectAgentReference,
-} from '@/api/agentChat'
+import { CircleHelp } from 'lucide-react'
+import { sendProjectAgentChat } from '@/api/agentChat'
 import { Button, Surface } from '@/components/ui'
 import { agentErrorMessage, trimChatHistory } from './messages'
 import { renderMarkdown } from '@/lib/renderMarkdown'
@@ -152,50 +148,44 @@ export default function ProjectChatPanel({ project, variant = 'embedded', initia
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
-  const [references, setReferences] = useState([])
-  const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(null)
   const [helpOpen, setHelpOpen] = useState(false)
   const bottomRef = useRef(null)
-  const fileInputRef = useRef(null)
   const tall = variant === 'page'
 
   useEffect(() => {
-    setMessages(initialMessages || [])
+    const restored = (initialMessages || []).map((msg) => {
+      if (!msg.metadata) return msg
+      try {
+        const extra = JSON.parse(msg.metadata)
+        return { ...msg, fit: extra.fit || null, fits: extra.fits || null, chart: extra.chart || null, systemError: extra.systemError || null }
+      } catch {
+        return msg
+      }
+    })
+    setMessages(restored)
     setDraft('')
     setError('')
-    setReferences([])
-    setUploading(false)
-    setUploadProgress(null)
   }, [project.id, initialMessages])
 
   useEffect(() => {
     if (typeof bottomRef.current?.scrollIntoView === 'function') {
       bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     }
-  }, [messages, sending, references])
+  }, [messages, sending])
 
   const sendPayload = async (text) => {
-    const message = (text || '').trim() || (references.length > 0 ? '请参考我关联的文件。' : '')
+    const message = (text || '').trim()
     if (!message || sending) return
     setSending(true)
     setError('')
     setDraft('')
     const history = trimChatHistory(messages)
-    const referenceIds = references.map((item) => item.id)
-    const attachedNames = references.map((item) => item.filename)
     setMessages((current) => [
       ...current,
-      {
-        role: 'user',
-        content: attachedNames.length
-          ? `${message}\n\n[关联文件: ${attachedNames.join('、')}]`
-          : message,
-      },
+      { role: 'user', content: message },
     ])
     try {
       const body = { message, history }
-      if (referenceIds.length > 0) body.referenceIds = referenceIds
       const result = await sendProjectAgentChat(project.id, body)
       const fits = Array.isArray(result.fits) && result.fits.length > 0
         ? result.fits
@@ -214,7 +204,9 @@ export default function ProjectChatPanel({ project, variant = 'embedded', initia
         },
       ])
       if (onAutoSave) {
-        const savedMessages = [...messages, { role: 'user', content: message }, { role: 'assistant', content: result.reply }]
+        const meta = { fit: result.fit || null, fits, chart: result.chart || null, systemError: result.systemError || null }
+        const metadata = JSON.stringify(meta)
+        const savedMessages = [...messages, { role: 'user', content: message }, { role: 'assistant', content: result.reply, metadata }]
         onAutoSave(savedMessages.filter((m) => m.role === 'user' || m.role === 'assistant'))
       }
     } catch (requestError) {
@@ -228,39 +220,8 @@ export default function ProjectChatPanel({ project, variant = 'embedded', initia
 
   const send = async () => {
     const text = draft.trim()
-    if (!text && references.length === 0) return
+    if (!text) return
     await sendPayload(text)
-  }
-
-  const onPickFile = async (event) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file) return
-    if (references.length >= 5) {
-      setError('单次最多关联 5 个参考文件')
-      return
-    }
-    setUploading(true)
-    setUploadProgress(0)
-    setError('')
-    try {
-      const uploaded = await uploadProjectAgentReference(project.id, file, setUploadProgress)
-      setReferences((current) => [...current, uploaded])
-    } catch (requestError) {
-      setError(agentErrorMessage(requestError))
-    } finally {
-      setUploading(false)
-      setUploadProgress(null)
-    }
-  }
-
-  const removeReference = async (reference) => {
-    setReferences((current) => current.filter((item) => item.id !== reference.id))
-    try {
-      await deleteProjectAgentReference(project.id, reference.id)
-    } catch {
-      // local remove still ok if server delete fails
-    }
   }
 
   const onKeyDown = (event) => {
@@ -342,51 +303,7 @@ export default function ProjectChatPanel({ project, variant = 'embedded', initia
         <div ref={bottomRef} />
       </div>
       {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      {references.length > 0 ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {references.map((item) => (
-            <span
-              key={item.id}
-              className="inline-flex max-w-full items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700"
-            >
-              <Paperclip size={12} className="shrink-0 text-slate-400" />
-              <span className="truncate">{item.filename}</span>
-              <button
-                type="button"
-                aria-label={`移除 ${item.filename}`}
-                className="rounded-full p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
-                onClick={() => removeReference(item)}
-                disabled={sending || uploading}
-              >
-                <X size={12} />
-              </button>
-            </span>
-          ))}
-        </div>
-      ) : null}
-      {typeof uploadProgress === 'number' ? (
-        <p className="mt-2 text-xs text-slate-400">上传中 {uploadProgress}%</p>
-      ) : null}
       <div className="mt-3 flex items-end gap-2">
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          accept=".csv,.xlsx,.txt,.md,.pdf,.png,.jpg,.jpeg,.webp,.docx"
-          onChange={onPickFile}
-        />
-        <Button
-          type="button"
-          variant="secondary"
-          disabled={sending || uploading || references.length >= 5}
-          onClick={() => fileInputRef.current?.click()}
-          aria-label="关联本机文件"
-        >
-          <span className="inline-flex items-center gap-1">
-            <Paperclip size={16} />
-            文件
-          </span>
-        </Button>
         <textarea
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -394,10 +311,10 @@ export default function ProjectChatPanel({ project, variant = 'embedded', initia
           rows={3}
           maxLength={2000}
           disabled={sending}
-          placeholder="输入问题；可点「文件」关联本机文件供 Agent 参考。Enter 发送，Shift+Enter 换行"
+          placeholder="输入问题。Enter 发送，Shift+Enter 换行"
           className="min-h-[4.5rem] flex-1 resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 disabled:bg-slate-100"
         />
-        <Button loading={sending} disabled={(!draft.trim() && references.length === 0) || uploading} onClick={send}>
+        <Button loading={sending} disabled={!draft.trim()} onClick={send}>
           发送
         </Button>
       </div>

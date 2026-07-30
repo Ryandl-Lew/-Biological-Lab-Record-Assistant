@@ -56,12 +56,25 @@ public class RecordChatService implements AgentChatUseCase {
     private static final String PROJECT_SYSTEM = """
             You are BioNote's read-only assistant for one collaboration project.
             Use the provided tools to explore data, read files, plot charts, and fit curves.
-            Available tools: list_project_attachments, list_record_attachments(recordId), read_attachment_content(filename),
-            plot_chart(chartType,xColumn,yColumn,referenceId?), fit_data(xColumn,yColumn,equation?,autoCompare?,referenceId?).
-            IMPORTANT: For chat-uploaded files (shown as CHAT_FILE_REFERENCES with --- BEGIN FILE --- markers),
-            always pass the referenceId from the marker to plot_chart/fit_data. Example: fit_data(xColumn="time",yColumn="od",referenceId="abc-123").
-            For fit_data: read the file first to see column names. If the user does not specify xColumn/yColumn, ask them to clarify.
-            NEVER invent numbers, parameters, or outcomes. Reply concisely in the user's language.
+
+            Available tools:
+            - list_project_attachments: list all project attachments
+            - list_record_attachments(recordId): list attachments for a record
+            - read_attachment_content(filename): read file content (CSV/TXT only)
+            - plot_chart(chartType, xColumn, yColumn): generate a chart from attachment data
+            - fit_data(xColumn, yColumn, equation?, autoCompare?): fit a curve to attachment data
+
+            CRITICAL RULES:
+            1. ALL data comes from project record attachments. Use list_project_attachments to discover files.
+            2. NEVER invent regression coefficients, R², RMSE, equations, or fit parameters.
+               These values MUST come from tool results.
+            3. NEVER output markdown chart syntax (![title](...)) or fit result tables.
+               The UI renders charts and fit cards automatically from tool results.
+            4. When the user asks to fit/analyze data, you MUST call the fit_data tool.
+               Do NOT attempt to calculate or estimate anything from the context preview.
+            5. If xColumn/yColumn are unclear, ask the user to specify them first.
+            6. Reply in the user's language. Keep responses brief and factual.
+               Only describe analysis results when tools have provided actual data.
             """;
 
     private static final Logger log = LoggerFactory.getLogger(RecordChatService.class);
@@ -113,10 +126,6 @@ public class RecordChatService implements AgentChatUseCase {
         String catalogText = curveFits.formatFitCatalog(catalog);
         context = context + "\n\nFIT_DATA_CATALOG:\n" + catalogText
                 + "\nEQUATION_CATALOG:\n" + FitMethodCatalog.catalogDescription();
-        String referenceContext = chatReferences.formatForContext(actor, projectId, request.referenceIds());
-        if (referenceContext != null && !referenceContext.isBlank()) {
-            context = context + "\n\n" + referenceContext;
-        }
 
         if (request.fitConfirm() != null) {
             return executeConfirmedFit(actor, projectId, project, parsed, context, request.fitConfirm());
@@ -456,8 +465,8 @@ public class RecordChatService implements AgentChatUseCase {
                             List<AgentDtos.FitView> fits = json.readValue(result.substring(4), json.getTypeFactory().constructCollectionType(List.class, AgentDtos.FitView.class));
                             fitsResults = fits;
                             fitResult = fits.isEmpty() ? null : fits.get(0);
+                            result = buildFitSummary(fits);
                         } catch (Exception ignored) {}
-                        result = "拟合已完成。";
                     }
                     if (result.startsWith("错误:") || result.startsWith("拟合执行失败:") || result.startsWith("未找到可用于")) {
                         if (toolError != null) {
@@ -588,26 +597,17 @@ public class RecordChatService implements AgentChatUseCase {
                 String xColumn = args.path("xColumn").asText();
                 String yColumn = args.path("yColumn").asText();
                 String csvHint = args.path("csvFilename").asText(null);
-                UUID refId = args.has("referenceId") && !args.path("referenceId").isNull() ? UUID.fromString(args.path("referenceId").asText()) : null;
                 if (xColumn.isBlank() || yColumn.isBlank()) {
                     return "请提供 xColumn 和 yColumn 参数，例如 xColumn=时间 yColumn=残糖。";
                 }
+                FitModels.FitProposal proposal = new FitModels.FitProposal(true, "y=a+b*x", false, List.of(),
+                        xColumn, yColumn, "CSV_ATTACHMENT", csvHint, List.of(), List.of(), null, null, null, null,
+                        false, false);
                 List<FitModels.DataPoint> points;
-                if (refId != null) {
-                    AgentChatReferenceService.ChatReferenceFile ref = chatReferences.readReferenceFile(actor, projectId, refId);
-                    points = curveFits.extractFromChatReference(ref.bytes(), ref.filename(), xColumn, yColumn);
-                } else {
-                    FitModels.FitProposal proposal = new FitModels.FitProposal(true, "y=a+b*x", false, List.of(),
-                            xColumn, yColumn, "CSV_ATTACHMENT", csvHint, List.of(), List.of(), null, null, null, null,
-                            false, false);
-                    try {
-                        points = curveFits.extractPlotPoints(actor, projectId, proposal);
-                    } catch (ApiException e) {
-                        return "未找到可用于绘图的数据。请确认列名 '" + xColumn + "' 和 '" + yColumn + "' 在 CSV/记录字段中存在。也可通过 referenceId 参数指定已上传的聊天文件。";
-                    }
-                }
-                if (points.isEmpty()) {
-                    return "未找到可用于绘图的数据。请确认列名正确，或使用 referenceId 参数指定已上传的聊天临时文件。";
+                try {
+                    points = curveFits.extractPlotPoints(actor, projectId, proposal);
+                } catch (ApiException e) {
+                    return "未找到可用于绘图的数据。请确认列名 '" + xColumn + "' 和 '" + yColumn + "' 在附件中存在。";
                 }
                 if (points.size() > 200) points = new ArrayList<>(points.subList(0, 200));
                 List<AgentDtos.ChartPointView> chartPoints = new ArrayList<>();
@@ -625,20 +625,13 @@ public class RecordChatService implements AgentChatUseCase {
                 String xColumn = args.path("xColumn").asText();
                 String yColumn = args.path("yColumn").asText();
                 boolean autoCompare = args.path("autoCompare").asBoolean(false);
-                UUID refId = args.has("referenceId") && !args.path("referenceId").isNull() ? UUID.fromString(args.path("referenceId").asText()) : null;
                 if (xColumn.isBlank() || yColumn.isBlank()) {
                     return "STOP. 请提供 xColumn 和 yColumn 参数。不要重试。";
                 }
-                List<FitModels.DataPoint> points;
                 FitModels.FitProposal proposal = new FitModels.FitProposal(true, equation, autoCompare, List.of(),
                         xColumn, yColumn, "CSV_ATTACHMENT", null, List.of(), List.of(), null, null, null, null,
                         false, false);
-                if (refId != null) {
-                    AgentChatReferenceService.ChatReferenceFile ref = chatReferences.readReferenceFile(actor, projectId, refId);
-                    points = curveFits.extractFromChatReference(ref.bytes(), ref.filename(), xColumn, yColumn);
-                } else {
-                    points = curveFits.extractPlotPoints(actor, projectId, proposal);
-                }
+                List<FitModels.DataPoint> points = curveFits.extractPlotPoints(actor, projectId, proposal);
                 if (points.isEmpty()) {
                     return "未找到可用于拟合的数据点。请确认列名正确。";
                 }
@@ -759,10 +752,30 @@ public class RecordChatService implements AgentChatUseCase {
             if (!"user".equals(role) && !"assistant".equals(role)) throw invalid("history role must be user or assistant");
             if (content.isEmpty()) continue;
             if (content.length() > 4000) throw invalid("history content exceeds 4000 characters");
-            values.add(new AgentDtos.ChatMessage(role, content));
+            values.add(new AgentDtos.ChatMessage(role, content, null));
         }
         if (values.size() > 20) throw invalid("history exceeds 20 messages");
         return values;
+    }
+
+    private String buildFitSummary(List<AgentDtos.FitView> fits) {
+        if (fits == null || fits.isEmpty()) return "拟合已完成（无结果）。";
+        StringBuilder sb = new StringBuilder("拟合已完成。请引用以下真实数据回复用户，不要编造信息：\n");
+        for (int i = 0; i < fits.size(); i++) {
+            AgentDtos.FitView f = fits.get(i);
+            sb.append("- ").append(f.equation()).append(": R²=")
+                    .append(String.format("%.4f", f.rSquared()))
+                    .append(", RMSE=").append(String.format("%.4f", f.rmse()))
+                    .append(", n=").append(f.n());
+            if (f.usedRecordCodes() != null && !f.usedRecordCodes().isEmpty()) {
+                sb.append(", 记录=").append(String.join(",", f.usedRecordCodes()));
+            }
+            if (f.skipped() != null && !f.skipped().isEmpty()) {
+                sb.append(", 跳过").append(f.skipped().size()).append("条");
+            }
+            sb.append('\n');
+        }
+        return sb.toString();
     }
 
     private Map<String, Object> requireVisibleRecord(UUID actor, UUID recordId) {

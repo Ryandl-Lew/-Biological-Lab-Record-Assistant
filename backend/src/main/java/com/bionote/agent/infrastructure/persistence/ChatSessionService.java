@@ -52,11 +52,11 @@ public class ChatSessionService implements ChatSessionStore {
             sessionId.toString(), userId.toString()
         );
         List<Map<String, Object>> msgRows = jdbc.queryForList(
-            "SELECT role, content FROM agent_chat_messages WHERE session_id = ? ORDER BY created_at ASC",
+            "SELECT role, content, metadata FROM agent_chat_messages WHERE session_id = ? ORDER BY created_at ASC",
             sessionId.toString()
         );
         List<AgentDtos.ChatMessage> messages = msgRows.stream().map(row ->
-            new AgentDtos.ChatMessage(String.valueOf(row.get("role")), String.valueOf(row.get("content")))
+            new AgentDtos.ChatMessage(String.valueOf(row.get("role")), String.valueOf(row.get("content")), nullable(row.get("metadata")))
         ).toList();
         return new AgentDtos.ChatSessionDetail(
             UUID.fromString(session.get("id").toString()),
@@ -82,8 +82,8 @@ public class ChatSessionService implements ChatSessionStore {
         if (request.messages() != null) {
             for (AgentDtos.ChatMessage msg : request.messages()) {
                 jdbc.update(
-                    "INSERT INTO agent_chat_messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)",
-                    UUID.randomUUID().toString(), sessionId.toString(), msg.role(), msg.content(), now
+                    "INSERT INTO agent_chat_messages (id, session_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    UUID.randomUUID().toString(), sessionId.toString(), msg.role(), msg.content(), msg.metadata(), now
                 );
             }
         }
@@ -103,8 +103,8 @@ public class ChatSessionService implements ChatSessionStore {
     public void addMessages(UUID sessionId, List<AgentDtos.ChatMessage> messages) {
         for (AgentDtos.ChatMessage msg : messages) {
             jdbc.update(
-                "INSERT INTO agent_chat_messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)",
-                UUID.randomUUID().toString(), sessionId.toString(), msg.role(), msg.content(), Instant.now()
+                "INSERT INTO agent_chat_messages (id, session_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                UUID.randomUUID().toString(), sessionId.toString(), msg.role(), msg.content(), msg.metadata(), Instant.now()
             );
         }
         jdbc.update("UPDATE agent_chat_sessions SET updated_at = ? WHERE id = ?", Instant.now(), sessionId.toString());
@@ -114,5 +114,9 @@ public class ChatSessionService implements ChatSessionStore {
         jdbc.update("DELETE FROM agent_chat_messages WHERE session_id = ?", sessionId.toString());
         int deleted = jdbc.update("DELETE FROM agent_chat_sessions WHERE id = ? AND user_id = ?", sessionId.toString(), userId.toString());
         if (deleted == 0) throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "对话不存在");
+    }
+
+    private static String nullable(Object value) {
+        return value == null ? null : String.valueOf(value);
     }
 }

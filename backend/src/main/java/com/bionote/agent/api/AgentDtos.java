@@ -18,7 +18,7 @@ public final class AgentDtos {
     public record StepView(UUID id,int stepNo,String stepType,String toolName,JsonNode request,JsonNode response,String contentHash,long latencyMs,long inputTokens,long outputTokens,Instant createdAt){}
     public record ArtifactSummary(UUID id,UUID runId,String artifactKind,UUID projectId,UUID recordId,String headline,JsonNode period,String contentHash,Instant createdAt){}
     public record ArtifactView(UUID id,UUID runId,String artifactKind,UUID projectId,UUID recordId,JsonNode content,JsonNode evidence,String contentHash,Instant createdAt){}
-    public record ChatMessage(@Schema(allowableValues={"user","assistant"}) String role,@Size(max=12000) String content){}
+    public record ChatMessage(@Schema(allowableValues={"user","assistant"}) String role,@Size(max=12000) String content, String metadata){}
     public record FitProposalView(
             String equation,
             boolean autoCompare,
@@ -38,8 +38,7 @@ public final class AgentDtos {
     public record ChatRequest(
             @NotBlank @Size(max=2000) String message,
             @Size(max=20) @Valid List<ChatMessage> history,
-            FitProposalView fitConfirm,
-            @Size(max=5) List<UUID> referenceIds
+            FitProposalView fitConfirm
     ){}
     public record ChatReferenceView(
             UUID id,

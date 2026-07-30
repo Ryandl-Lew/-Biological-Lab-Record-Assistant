@@ -168,10 +168,10 @@ public class AgentChatReferenceService implements AgentChatReferenceUseCase {
                     if (!headers.isEmpty()) {
                         sb.append(String.join(",", headers)).append('\n');
                     }
-                    int dataStart = headers.isEmpty() || !rows.isEmpty() && rows.get(0).length > 0 ? 
-                            (headers.isEmpty() ? -1 : 0) : 0;
+                    int dataStart = headers.isEmpty() ? 0 : 1;
                     int rowCount = 0;
-                    for (int i = Math.max(0, dataStart); i < rows.size() && rowCount < 500; i++) {
+                    int maxPreviewRows = 5;
+                    for (int i = dataStart; i < rows.size() && rowCount < maxPreviewRows; i++) {
                         String[] row = rows.get(i);
                         if (row.length == 0) continue;
                         sb.append(String.join(",", row)).append('\n');
