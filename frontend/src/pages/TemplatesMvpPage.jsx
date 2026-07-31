@@ -121,6 +121,7 @@ export default function TemplatesMvpPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
           <Surface
             className="max-h-[85vh] w-full max-w-2xl overflow-y-auto"
+            style={{ backgroundColor: 'white' }}
             title={preview.name}
             extra={
               <Button variant="ghost" onClick={() => setPreview(null)}>
