@@ -14,13 +14,11 @@ import {
   requestReviewChanges,
   saveBlob,
 } from '@/api'
-import { saveRecordSession, appendSessionMessages } from '@/api/agentChat'
 import { TEMPLATE_FIELD_TYPE_LABELS } from '@/domain'
 import AttachmentManager from '@/components/record/AttachmentManager'
 import SubmissionDialog from '@/components/record/SubmissionDialog'
 
 const RevisionHistoryPanel = lazy(() => import('@/components/revision/RevisionHistoryPanel'))
-const RecordSummaryPanel = lazy(() => import('@/components/agent/RecordSummaryPanel'))
 const AutoSummaryPanel = lazy(() => import('@/components/agent/AutoSummaryPanel'))
 
 export default function RecordDetailMvpPage() {
@@ -35,9 +33,7 @@ export default function RecordDetailMvpPage() {
     [comment, setComment] = useState(''),
     [deciding, setDeciding] = useState(false),
     [previewHtml, setPreviewHtml] = useState(''),
-    [submitOpen, setSubmitOpen] = useState(false),
-    [sessionId, setSessionId] = useState(null),
-    [chatKey, setChatKey] = useState(0)
+    [submitOpen, setSubmitOpen] = useState(false)
   const tab = searchParams.get('tab') || 'current'
   const loadHistory = useCallback(
     async (page = 0) => {
@@ -126,18 +122,6 @@ export default function RecordDetailMvpPage() {
     )
     setSearchParams(next, { replace: true })
   }
-  const handleAutoSave = async (messages) => {
-    if (messages.length === 0 || !record) return
-    try {
-      if (sessionId) {
-        await appendSessionMessages(sessionId, messages.slice(-2))
-      } else {
-        const title = messages[0]?.content?.slice(0, 50) || '新对话'
-        const detail = await saveRecordSession(record.id, { title, messages })
-        setSessionId(detail.id)
-      }
-    } catch (e) {}
-  }
   return (
     <section className="space-y-6">
       <button
@@ -206,7 +190,7 @@ export default function RecordDetailMvpPage() {
           items={[
             { key: 'current', label: '当前内容' },
             { key: 'history', label: '版本历史' },
-            { key: 'summary', label: '记录问答' },
+            { key: 'summary', label: '记录总结' },
           ]}
           activeKey={tab}
           onChange={(value) => updateParams({ tab: value === 'current' ? '' : value })}
@@ -335,34 +319,15 @@ export default function RecordDetailMvpPage() {
         </Suspense>
       )}
       {tab === 'summary' && (
-        <>
-          <Suspense
-            fallback={
-              <p role="status" className="py-12 text-center text-slate-400">
-                加载问答组件中…
-              </p>
-            }
-          >
-            <RecordSummaryPanel
-              key={chatKey}
-              record={record}
-              onAutoSave={handleAutoSave}
-              onNewChat={() => {
-                setSessionId(null)
-                setChatKey((k) => k + 1)
-              }}
-            />
-          </Suspense>
-          <Suspense
-            fallback={
-              <p role="status" className="py-12 text-center text-slate-400">
-                加载总结组件中…
-              </p>
-            }
-          >
-            <AutoSummaryPanel subjectType="record" subjectId={record.id} />
-          </Suspense>
-        </>
+        <Suspense
+          fallback={
+            <p role="status" className="py-12 text-center text-slate-400">
+              加载总结组件中…
+            </p>
+          }
+        >
+          <AutoSummaryPanel subjectType="record" subjectId={record.id} />
+        </Suspense>
       )}
       <SubmissionDialog
         record={record}

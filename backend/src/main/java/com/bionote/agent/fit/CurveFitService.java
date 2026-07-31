@@ -251,10 +251,11 @@ public class CurveFitService {
         if (xCols.isEmpty() || yCols.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "FIT_MISSING_MAPPING", "请指定自变量与因变量列名");
         }
+        String normalizedEquation = FitMethodCatalog.normalizeEquation(proposal.equation());
         boolean useMultivariate =
                 proposal.multivariate()
                         || xCols.size() > 1
-                        || looksLikeMultivariateEquation(proposal.equation());
+                        || looksLikeMultivariateEquation(normalizedEquation);
         boolean timeToMinutes =
                 proposal.timeToMinutes()
                         || xCols.stream()
@@ -294,16 +295,16 @@ public class CurveFitService {
                                                 : matrix.usedRecordCodes().get(0),
                                         "TABLE_ATTACHMENT"));
                     }
-                    String equation = proposal.equation();
-                    if (equation == null
-                            || equation.isBlank()
-                            || looksLikeMultivariateEquation(equation)) {
-                        equation = "y=a+b*x";
+                    String fitEquation = normalizedEquation;
+                    if (fitEquation == null
+                            || fitEquation.isBlank()
+                            || looksLikeMultivariateEquation(fitEquation)) {
+                        fitEquation = "y=a+b*x";
                     }
                     try {
                         results.add(
                                 engine.fit(
-                                        ExpressionParser.parseEquation(equation),
+                                        ExpressionParser.parseEquation(fitEquation),
                                         points,
                                         matrix.skipped()));
                     } catch (ApiException e) {
@@ -354,16 +355,16 @@ public class CurveFitService {
             }
             return List.of(engine.fitBest(equations, extracted.points(), extracted.skipped()));
         }
-        if (proposal.equation() == null
-                || proposal.equation().isBlank()
-                || looksLikeMultivariateEquation(proposal.equation())) {
+        if (normalizedEquation == null
+                || normalizedEquation.isBlank()
+                || looksLikeMultivariateEquation(normalizedEquation)) {
             throw new ApiException(
                     HttpStatus.BAD_REQUEST,
                     "FIT_INVALID_EQUATION",
                     "当前方案方程无法用于单变量拟合。请改用预置方程（如 y=a+b*x），或明确自变量/因变量列以启用多元回归。");
         }
         ExpressionParser.CompiledEquation equation =
-                ExpressionParser.parseEquation(proposal.equation());
+                ExpressionParser.parseEquation(normalizedEquation);
         return List.of(engine.fit(equation, extracted.points(), extracted.skipped()));
     }
 

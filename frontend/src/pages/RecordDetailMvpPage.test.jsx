@@ -5,6 +5,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchRecord, fetchReviewerCandidates } from '@/api'
 import RecordDetailMvpPage from './RecordDetailMvpPage'
 
+vi.mock('@/components/agent/AutoSummaryPanel', () => ({
+  default: () => <div>记录总结入口</div>,
+}))
+
 vi.mock('@/api', () => ({
   fetchRecord: vi.fn(),
   fetchRevisionSummaries: vi
@@ -86,5 +90,16 @@ describe('RecordDetailMvpPage', () => {
 
     expect(screen.getByRole('dialog', { name: '提交审核' })).toBeInTheDocument()
     expect(await screen.findByRole('option', { name: /审核人/ })).toBeInTheDocument()
+  })
+
+  it('keeps only the record summary entry and removes record Q&A', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(await screen.findByRole('button', { name: '记录总结' }))
+
+    expect(await screen.findByText('记录总结入口')).toBeInTheDocument()
+    expect(screen.queryByText('记录问答')).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText(/输入问题/)).not.toBeInTheDocument()
   })
 })

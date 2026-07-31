@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createProjectAgentRun, fetchProjectArtifacts, fetchRecordArtifacts } from '@/api'
 import ProgressReportPanel from './ProgressReportPanel'
-import RecordSummaryPanel from './RecordSummaryPanel'
 
 vi.mock('@/api', () => ({
   createProjectAgentRun: vi.fn(),
@@ -22,16 +21,6 @@ describe('Agent report panels', () => {
     vi.clearAllMocks()
     fetchRecordArtifacts.mockResolvedValue({ items: [], meta: { totalElements: 0 } })
     fetchProjectArtifacts.mockResolvedValue({ items: [], meta: { totalElements: 0 } })
-  })
-
-  it('renders the record Q&A chat panel', async () => {
-    render(
-      <RecordSummaryPanel record={{ id: 'record', creatorId: 'creator', currentRevisionNo: 0 }} />,
-    )
-    expect(screen.getByText('记录问答')).toBeInTheDocument()
-    expect(
-      screen.getByPlaceholderText('输入问题，Enter 发送，Shift+Enter 换行'),
-    ).toBeInTheDocument()
   })
 
   it('lets only the project owner generate progress reports', async () => {

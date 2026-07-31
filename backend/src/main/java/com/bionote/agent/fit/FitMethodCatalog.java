@@ -87,6 +87,12 @@ public final class FitMethodCatalog {
         return null;
     }
 
+    /** Accept catalog IDs/aliases from model tool arguments while preserving custom equations. */
+    public static String normalizeEquation(String value) {
+        String resolved = resolveEquation(value);
+        return resolved == null ? value : resolved;
+    }
+
     public static String resolveFromMessage(String message) {
         if (message == null || message.isBlank()) return null;
         String custom = extractCustomEquation(message);

@@ -11,6 +11,8 @@ class FitMethodCatalogTest {
         assertThat(FitMethodCatalog.resolveFromMessage("指数衰减剂量反应")).isEqualTo("y=a*exp(-k*x)+b");
         assertThat(FitMethodCatalog.resolveFromMessage("用米氏方程拟合")).isEqualTo("y=a*x/(b+x)");
         assertThat(FitMethodCatalog.resolveFromMessage("幂函数")).isEqualTo("y=a*x^b");
+        assertThat(FitMethodCatalog.normalizeEquation("linear")).isEqualTo("y=a+b*x");
+        assertThat(FitMethodCatalog.normalizeEquation("线性")).isEqualTo("y=a+b*x");
         assertThat(FitMethodCatalog.wantsAutoCompare("方程不太确定，试试看")).isTrue();
         assertThat(FitMethodCatalog.wantsAutoCompare("明确线性拟合")).isFalse();
         assertThat(FitMethodCatalog.allEquations().size()).isGreaterThanOrEqualTo(10);

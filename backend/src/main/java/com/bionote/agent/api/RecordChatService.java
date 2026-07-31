@@ -606,7 +606,7 @@ public class RecordChatService implements AgentChatUseCase {
         }
         return new FitModels.FitProposal(
                 true,
-                view.equation(),
+                FitMethodCatalog.normalizeEquation(view.equation()),
                 view.autoCompare(),
                 view.candidateIds() == null ? List.of() : view.candidateIds(),
                 view.xSpec(),
@@ -1098,7 +1098,8 @@ public class RecordChatService implements AgentChatUseCase {
                 }
             }
             if ("fit_data".equals(name)) {
-                String equation = args.path("equation").asText("y=a+b*x");
+                String equation =
+                        FitMethodCatalog.normalizeEquation(args.path("equation").asText("y=a+b*x"));
                 String xColumn = args.path("xColumn").asText();
                 String yColumn = args.path("yColumn").asText();
                 boolean autoCompare = args.path("autoCompare").asBoolean(false);

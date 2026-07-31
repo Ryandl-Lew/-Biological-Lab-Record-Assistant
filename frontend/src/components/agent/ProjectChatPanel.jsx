@@ -16,6 +16,33 @@ function formatNum(value) {
   return Number(value).toFixed(4)
 }
 
+function snapshotReference(reference) {
+  return {
+    id: reference.id,
+    filename: reference.filename,
+    contentType: reference.contentType,
+    sizeBytes: reference.sizeBytes,
+    kind: reference.kind,
+    columns: Array.isArray(reference.columns) ? reference.columns : [],
+  }
+}
+
+function collectConversationReferenceIds(messages, currentReferences, maxItems = 5) {
+  const ids = []
+  const seen = new Set()
+  const add = (reference) => {
+    if (!reference?.id || seen.has(reference.id) || ids.length >= maxItems) return
+    seen.add(reference.id)
+    ids.push(reference.id)
+  }
+
+  for (const reference of currentReferences || []) add(reference)
+  for (const message of [...(messages || [])].reverse()) {
+    for (const attachment of [...(message.attachments || [])].reverse()) add(attachment)
+  }
+  return ids
+}
+
 function FitResultCard({ fit }) {
   if (!fit) return null
   const params = fit.parameters
@@ -185,6 +212,7 @@ export default function ProjectChatPanel({
           fits: extra.fits || null,
           chart: extra.chart || null,
           systemError: extra.systemError || null,
+          attachments: extra.attachments || [],
         }
       } catch {
         return msg
@@ -208,13 +236,21 @@ export default function ProjectChatPanel({
     setSending(true)
     setError('')
     setDraft('')
+    const sentReferences = references.map(snapshotReference)
+    const userMessage = {
+      role: 'user',
+      content: message,
+      attachments: sentReferences,
+    }
     const history = trimChatHistory(messages)
-    setMessages((current) => [...current, { role: 'user', content: message }])
+    const conversationReferenceIds = collectConversationReferenceIds(messages, sentReferences)
+    setMessages((current) => [...current, userMessage])
+    setReferences([])
     try {
       const body = {
         message,
         history,
-        referenceIds: references.map((item) => item.id),
+        referenceIds: conversationReferenceIds,
       }
       const result = await sendProjectAgentChat(project.id, body)
       const fits =
@@ -242,9 +278,12 @@ export default function ProjectChatPanel({
           systemError: result.systemError || null,
         }
         const metadata = JSON.stringify(meta)
+        const userMetadata = sentReferences.length
+          ? JSON.stringify({ attachments: sentReferences })
+          : null
         const savedMessages = [
           ...messages,
-          { role: 'user', content: message },
+          { ...userMessage, metadata: userMetadata },
           { role: 'assistant', content: result.reply, metadata },
         ]
         onAutoSave(savedMessages.filter((m) => m.role === 'user' || m.role === 'assistant'))
@@ -253,6 +292,7 @@ export default function ProjectChatPanel({
       setError(agentErrorMessage(requestError))
       setMessages((current) => current.slice(0, -1))
       setDraft(text)
+      setReferences(sentReferences)
     } finally {
       setSending(false)
     }
@@ -340,6 +380,24 @@ export default function ProjectChatPanel({
                     : 'border border-slate-200 bg-white text-slate-800'
                 }`}
               >
+                {item.role === 'user' && item.attachments?.length > 0 ? (
+                  <div
+                    aria-label="本条消息附件"
+                    className="mb-2 space-y-1 border-b border-white/20 pb-2"
+                  >
+                    {item.attachments.map((attachment) => (
+                      <div
+                        key={attachment.id}
+                        className="flex min-w-0 items-center gap-1.5 text-xs text-white/90"
+                      >
+                        <Paperclip size={13} className="shrink-0" />
+                        <span className="truncate" title={attachment.filename}>
+                          {attachment.filename}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
                 {item.role === 'assistant' && item.systemError ? (
                   <div className="mb-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
                     <p className="mb-1 font-semibold">文件读取失败</p>
@@ -379,7 +437,7 @@ export default function ProjectChatPanel({
           </p>
         )}
         {references.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2" aria-label="已关联附件">
+          <div className="mt-3 flex flex-wrap gap-2" aria-label="待发送附件">
             {references.map((reference) => (
               <span
                 key={reference.id}
@@ -408,6 +466,7 @@ export default function ProjectChatPanel({
             ref={fileInputRef}
             type="file"
             className="hidden"
+            aria-label="上传问答附件"
             accept=".csv,.xlsx,.txt,.md,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             onChange={uploadReference}
           />

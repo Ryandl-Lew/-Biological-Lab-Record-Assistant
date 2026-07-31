@@ -5,23 +5,24 @@ import AttachmentManager from './AttachmentManager'
 import { previewAttachment, uploadAttachment } from '@/api'
 
 vi.mock('@/api', () => ({
-  fetchAttachments: vi
-    .fn()
-    .mockResolvedValue([
-      {
-        id: 'a1',
-        originalFilename: '结果.png',
-        mediaType: 'image/png',
-        sizeBytes: 120,
-        previewable: true,
-        canDelete: true,
-      },
-    ]),
+  fetchAttachments: vi.fn().mockResolvedValue([
+    {
+      id: 'a1',
+      originalFilename: '结果.png',
+      mediaType: 'image/png',
+      sizeBytes: 120,
+      previewable: true,
+      canDelete: true,
+    },
+  ]),
   uploadAttachment: vi.fn(),
   deleteAttachment: vi.fn(),
   downloadAttachment: vi.fn(),
   saveBlob: vi.fn(),
   previewAttachment: vi.fn(),
+}))
+vi.mock('./PdfPreview', () => ({
+  default: ({ blob }) => <div data-testid="pdf-canvas-preview">{blob ? 'PDF.js preview' : ''}</div>,
 }))
 
 describe('AttachmentManager', () => {
@@ -93,7 +94,7 @@ describe('AttachmentManager', () => {
     expect(await screen.findByText(/# 实验结果/)).toBeInTheDocument()
     expect(screen.getByText('Markdown 文本预览')).toBeInTheDocument()
   })
-  it('uses an unsandboxed authenticated blob for PDF rendering', async () => {
+  it('uses the PDF.js canvas preview instead of an iframe', async () => {
     previewAttachment.mockResolvedValue({ blob: new Blob(['%PDF-'], { type: 'application/pdf' }) })
     const user = userEvent.setup()
     render(
@@ -112,8 +113,7 @@ describe('AttachmentManager', () => {
       />,
     )
     await user.click(screen.getByRole('button', { name: '预览' }))
-    const frame = await screen.findByTitle('PDF 附件预览')
-    expect(frame).toHaveAttribute('src', 'blob:preview')
-    expect(frame).not.toHaveAttribute('sandbox')
+    expect(await screen.findByTestId('pdf-canvas-preview')).toHaveTextContent('PDF.js preview')
+    expect(screen.queryByTitle('PDF 附件预览')).not.toBeInTheDocument()
   })
 })

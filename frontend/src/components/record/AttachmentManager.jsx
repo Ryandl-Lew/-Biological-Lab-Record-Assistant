@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Download, ExternalLink, Eye, FileText, Paperclip, Trash2, Upload } from 'lucide-react'
 import { Button, ConfirmDialog, EmptyState, Surface } from '@/components/ui'
 import {
@@ -9,6 +9,8 @@ import {
   saveBlob,
   uploadAttachment,
 } from '@/api'
+
+const PdfPreview = lazy(() => import('./PdfPreview'))
 
 const prettySize = (bytes) =>
   bytes < 1024
@@ -131,7 +133,7 @@ export default function AttachmentManager({
       const markdown = item.mediaType === 'text/markdown' || lowerName.endsWith('.md')
       const csv = item.mediaType === 'text/csv' || lowerName.endsWith('.csv')
       const text = markdown || csv ? await blob.text() : null
-      setPreview({ ...item, url: objectUrl.current, markdown, csv, text })
+      setPreview({ ...item, blob, url: objectUrl.current, markdown, csv, text })
     } catch (e) {
       setError(e.message)
     }
@@ -349,12 +351,18 @@ export default function AttachmentManager({
                     </table>
                   </div>
                 </div>
+              ) : preview.mediaType === 'application/pdf' ? (
+                <Suspense
+                  fallback={
+                    <p role="status" className="py-12 text-center text-sm text-slate-500">
+                      正在加载 PDF 预览器…
+                    </p>
+                  }
+                >
+                  <PdfPreview blob={preview.blob} />
+                </Suspense>
               ) : (
-                <iframe
-                  title="PDF 附件预览"
-                  src={preview.url}
-                  className="h-full w-full rounded-xl border border-slate-200 bg-white"
-                />
+                <p className="py-12 text-center text-sm text-slate-500">该文件暂不支持预览</p>
               )}
             </div>
           </div>
