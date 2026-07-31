@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { executeRestore, previewRestore } from '@/api'
 import { Button } from '@/components/ui'
+import { createUuid } from '@/lib/uuid'
 
-const newKey = () => globalThis.crypto?.randomUUID?.() || `restore-${Date.now()}-${Math.random()}`
+const newKey = () => createUuid()
 
 export default function RestorePreviewDialog({ record, revision, open, onClose, onSuccess }) {
   const [restoreAttachments, setRestoreAttachments] = useState(true)
