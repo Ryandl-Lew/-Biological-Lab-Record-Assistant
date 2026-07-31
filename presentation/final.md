@@ -302,15 +302,6 @@ Controller 和前端页面不需要分别编写大量权限判断，而是由后
 
 真正的授权由后端根据业务上下文计算：
 
-~~~text
-JWT 身份
-  + 项目成员角色
-  + 记录创建者 / 指定审核人
-  + 项目与记录状态
-  + 当前操作类型
-  → RecordActionPolicy / Service 决策
-  → capabilities 或统一错误
-~~~
 
 - **角色与对象同时约束**：OWNER、MEMBER、REVIEWER 提供角色边界；项目成员关系、资源所有权和 `reviewerId` 继续限制具体对象，防止同角色用户横向访问其他项目或修改他人记录。
 - **状态决定可执行动作**：记录只允许 `IN_PROGRESS / CHANGES_REQUESTED → IN_REVIEW → CHANGES_REQUESTED / COMPLETED`。审核期间冻结内容和附件，完成后永久只读；只有记录创建者能编辑，只有当前指定审核人能作出审核结论。
@@ -324,20 +315,8 @@ JWT 身份
 系统将持续编辑的 Working Copy 与审核、追溯使用的不可变 Revision 分离：自动保存只更新工作副本，提交审核才固化 R1、R2 等 Revision，因此每条审核意见始终指向确定内容。
 
 - **语义快照**：`SnapshotNormalizer` 将固定字段、模板字段、TipTap 正文块、附件和审核元数据整理为稳定结构；模板结构也随 Revision 保存，后续修改模板不会改变历史版本的含义。
-- **规范化与内容指纹**：数字、日期、换行和空白等先规范化，再按稳定顺序序列化并计算 SHA-256 canonical hash，用于判断真实变化和识别过期恢复预览。
-- **领域感知 Diff**：固定字段和模板字段按 Key 对齐，附件按 UUID 做集合比较，富文本按“块类型 + 顺序 + 文本”比较，返回 ADDED、REMOVED、MODIFIED、UNCHANGED，而不是把整份 JSON 当作字符串。
-- **块内文本算法**：多行字段和正文块内部使用 Token 级 LCS 生成 EQUAL、INSERT、DELETE hunk；对超大输入限制文本、矩阵规模、hunk 和 section 数量，必要时确定性降级并返回 `truncated` 与 warning，避免 Diff 本身耗尽资源。
-- **单一能力复用**：同一 `RevisionDiffUseCase` 支持 Revision/Revision 与 Revision/Working Copy，也被恢复流程和 Agent 工具复用，避免多套比较逻辑产生不同结论。
-
-~~~text
-Revision / Working Copy
-  → 规范化 Snapshot + canonical hash
-  → 字段 Key / 附件 UUID / 富文本块匹配
-  → 块内 LCS 文本 Diff
-  → Summary + Sections + Warnings
-~~~
-
-因此系统回答的不是“两个 JSON 是否不同”，而是“哪个实验字段、哪段正文、哪些附件发生了什么变化”，更符合实验复核和可复现需求。
+- **规范化与内容指纹**：数字、日期、换行和空白等先规范化，再按稳定顺序序列化并计算 SHA-256  hash，用于判断真实变化和识别过期恢复预览。
+- **领域感知 Diff**：固定字段和模板字段按 Key 对齐，附件按 UUID 做集合比较，块内文本采用基于动态规划的最长公共子序列算法，即 LCS，输出 EQUAL、INSERT、DELETE 操作。
 
 #### 2.6.4 两阶段恢复与并发一致性
 
@@ -355,16 +334,6 @@ Revision / Working Copy
 
 系统没有让大模型直接连接数据库，而是用 `AgentHarness` 把模型包围在授权、预算、验证和审计边界内。
 
-~~~text
-Run API → agent_runs 数据库队列 → Worker → AgentHarness
-                                           ├─ ModelClient
-                                           ├─ Tool Registry / Executor
-                                           ├─ Schema / Evidence Validator
-                                           └─ Trace Recorder
-                                                  ↓
-                                        Artifact + SUCCEEDED
-~~~
-
 - **异步执行与状态机**：API 创建 QUEUED 任务后立即返回，Worker 原子领取任务；状态只能按 QUEUED、RUNNING 和五种终态合法迁移，模型调用不会长期占用 HTTP 请求。
 - **模型与业务解耦**：`AgentModelClient` 提供统一接口，Fake Provider 支持离线确定性测试，OpenAI-compatible Adapter 接入真实模型，Harness 主循环不依赖具体厂商。
 - **最小权限工具系统**：`AgentTool` SPI 与 Registry 只注册通过校验的 READ_ONLY 工具；每次调用都经过 Prompt 白名单、参数 Schema/Bean Validation、输出边界和当前用户对象级授权，模型不能覆盖服务端注入的 actor、project、record 上下文。
@@ -373,7 +342,6 @@ Run API → agent_runs 数据库队列 → Worker → AgentHarness
 - **Trace 与原子成功**：Trace 只保存经过裁剪、白名单和脱敏的请求/结果摘要、耗时与 Token，不保存隐藏推理；Artifact 写入与 Run 置为 SUCCEEDED 在同一事务完成，避免“状态成功但报告不存在”。
 - **前端可观察性**：界面采用退避轮询展示状态，支持取消、重跑、Evidence 跳转与 Trace Replay；Replay 只展开后端已保存的脱敏步骤，不会再次调用模型或工具。
 
-该框架不能消除模型的不确定性，但能保证模型“只能读取有权数据、必须给出可核验证据、失败时不产生伪成功、全过程可以复核”。
 
 #### 2.6.6 模型理解意图，确定性引擎负责计算
 

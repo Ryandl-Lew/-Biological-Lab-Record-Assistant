@@ -1,8 +1,9 @@
 import { request } from './client'
+import { createUuid } from '@/lib/uuid'
 
 export const fetchReviewerCandidates = (recordId) =>
   request(`/records/${recordId}/reviewer-candidates`)
-export const submitRecord = (recordId, input, idempotencyKey = crypto.randomUUID()) =>
+export const submitRecord = (recordId, input, idempotencyKey = createUuid()) =>
   request(`/records/${recordId}/submissions`, {
     method: 'POST',
     headers: { 'Idempotency-Key': idempotencyKey },
