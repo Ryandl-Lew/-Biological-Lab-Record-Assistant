@@ -5,7 +5,6 @@ import com.bionote.common.ApiException;
 import com.bionote.project.ProjectMemberStore;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -156,8 +155,7 @@ public class CurveFitService {
             if (lower.endsWith(".xlsx")) {
                 return extractor.parseXlsx(fileBytes, dummyId, "", xCol, yCol);
             }
-            return extractor.parseCsv(
-                    new String(fileBytes, StandardCharsets.UTF_8), dummyId, "", xCol, yCol);
+            return extractor.parseCsv(extractor.decodeText(fileBytes), dummyId, "", xCol, yCol);
         } catch (Exception e) {
             return List.of();
         }

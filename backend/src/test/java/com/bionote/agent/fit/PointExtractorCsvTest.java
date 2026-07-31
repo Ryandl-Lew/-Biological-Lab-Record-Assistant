@@ -34,4 +34,17 @@ class PointExtractorCsvTest {
         assertThat(points.get(0).x()).isEqualTo(0.5);
         assertThat(points.get(0).y()).isEqualTo(1.5);
     }
+
+    @Test
+    void parsesSemicolonCsvAndSupportsPerfectLinearFit() {
+        String csv = "time;value\n0;1\n1;3\n2;5\n3;7\n";
+        List<FitModels.DataPoint> points =
+                extractor.parseCsv(csv, UUID.randomUUID(), "EXP-3", "time", "value");
+        assertThat(points).extracting(FitModels.DataPoint::x).containsExactly(0.0, 1.0, 2.0, 3.0);
+        assertThat(points).extracting(FitModels.DataPoint::y).containsExactly(1.0, 3.0, 5.0, 7.0);
+        FitModels.FitResult fit =
+                new CurveFitEngine()
+                        .fit(ExpressionParser.parseEquation("y=a+b*x"), points, List.of());
+        assertThat(fit.rSquared()).isGreaterThan(0.999999);
+    }
 }

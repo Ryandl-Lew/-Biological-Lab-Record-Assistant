@@ -6,6 +6,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -62,6 +65,22 @@ public class PointExtractor {
                                     record, id, code, xSpec, ySpec, intent.csvNameHint());
                     if (tablePoints.isEmpty())
                         skipped.add(new FitModels.SkipInfo(id, code, "表格附件中未找到可用数据点"));
+                    else points.addAll(tablePoints);
+                } else if ("AUTO".equals(source)) {
+                    FitModels.DataPoint point = fromFields(record, id, code, xSpec, ySpec);
+                    if (point != null) {
+                        points.add(point);
+                        continue;
+                    }
+                    List<FitModels.DataPoint> tablePoints =
+                            fromTabularAttachment(
+                                    record, id, code, xSpec, ySpec, intent.csvNameHint());
+                    if (tablePoints.isEmpty())
+                        skipped.add(
+                                new FitModels.SkipInfo(
+                                        id,
+                                        code,
+                                        "字段或表格附件中缺少有效数值: " + xSpec + "/" + ySpec));
                     else points.addAll(tablePoints);
                 } else {
                     FitModels.DataPoint point = fromFields(record, id, code, xSpec, ySpec);
@@ -138,7 +157,7 @@ public class PointExtractor {
         if (filename.endsWith(".xlsx")) {
             return parseXlsx(bytes, id, code, xSpec, ySpec, false);
         }
-        String text = new String(bytes, StandardCharsets.UTF_8);
+        String text = decodeText(bytes);
         return parseCsv(text, id, code, xSpec, ySpec, false);
     }
 
@@ -175,7 +194,7 @@ public class PointExtractor {
                         HttpStatus.BAD_REQUEST, "FIT_EXCEL_PARSE_FAILED", "无法解析 Excel 附件");
             }
         } else {
-            rows = csvRows(new String(bytes, StandardCharsets.UTF_8));
+            rows = csvRows(decodeText(bytes));
         }
         return new LoadedTable(filename, rows);
     }
@@ -205,7 +224,10 @@ public class PointExtractor {
 
         boolean[] timeFlags = new boolean[xCols.size()];
         for (int i = 0; i < xCols.size(); i++) {
-            timeFlags[i] = timeToMinutes || looksLikeTimeColumn(xCols.get(i));
+            timeFlags[i] =
+                    timeToMinutes
+                            || shouldAutoParseClockTime(
+                                    rows, start, xIndex[i], xCols.get(i));
         }
 
         double[] timeOrigin = new double[xCols.size()];
@@ -275,6 +297,19 @@ public class PointExtractor {
         if (name == null) return false;
         String n = name.trim().toLowerCase(Locale.ROOT);
         return n.equals("时间") || n.equals("time") || n.contains("时刻") || n.equals("采样时间");
+    }
+
+    private boolean shouldAutoParseClockTime(
+            List<String[]> rows, int start, int columnIndex, String columnName) {
+        if (!looksLikeTimeColumn(columnName)) return false;
+        for (int rowIndex = start; rowIndex < rows.size(); rowIndex++) {
+            String[] row = rows.get(rowIndex);
+            if (columnIndex < 0 || row.length <= columnIndex) continue;
+            String raw = row[columnIndex] == null ? "" : row[columnIndex].trim();
+            if (raw.isBlank() || parseDouble(raw) != null) continue;
+            if (parseTimeToMinutes(raw) != null) return true;
+        }
+        return false;
     }
 
     /** Absolute minutes from an arbitrary epoch; callers subtract the minimum. */
@@ -410,7 +445,7 @@ public class PointExtractor {
                     rows = readSheetRows(workbook.getSheetAt(0));
                 }
             } else {
-                String text = new String(bytes, StandardCharsets.UTF_8);
+                String text = decodeText(bytes);
                 rows = csvRows(text);
             }
             if (rows.isEmpty()) return List.of();
@@ -477,9 +512,10 @@ public class PointExtractor {
     private List<String[]> csvRows(String text) {
         String[] lines = text.split("\\R");
         List<String[]> rows = new ArrayList<>();
+        char delimiter = detectDelimiter(lines);
         for (String line : lines) {
             if (line == null || line.isBlank() || line.startsWith("#")) continue;
-            rows.add(splitCsvLine(line));
+            rows.add(splitCsvLine(line, delimiter));
             if (rows.size() > MAX_TABLE_ROWS) break;
         }
         return rows;
@@ -494,8 +530,7 @@ public class PointExtractor {
             String sourceLabel,
             boolean timeToMinutes) {
         MatrixSlice slice =
-                matrixFromRows(
-                        rows, List.of(xSpec), ySpec, timeToMinutes || looksLikeTimeColumn(xSpec));
+                matrixFromRows(rows, List.of(xSpec), ySpec, timeToMinutes);
         List<FitModels.DataPoint> points = new ArrayList<>();
         for (int i = 0; i < slice.y.length; i++) {
             points.add(new FitModels.DataPoint(slice.x[i][0], slice.y[i], id, code, sourceLabel));
@@ -511,10 +546,21 @@ public class PointExtractor {
 
     private int columnIndex(String[] header, String spec) {
         if (spec.matches("\\d+")) return parseIndex(spec, header.length);
+        String wanted = normalizeColumn(spec);
         for (int i = 0; i < header.length; i++) {
-            if (header[i].trim().equalsIgnoreCase(spec.trim())) return i;
+            if (normalizeColumn(header[i]).equals(wanted)) return i;
         }
-        return -1;
+        int fuzzy = -1;
+        for (int i = 0; i < header.length; i++) {
+            String actual = normalizeColumn(header[i]);
+            if (wanted.length() >= 2
+                    && actual.length() >= 2
+                    && (actual.contains(wanted) || wanted.contains(actual))) {
+                if (fuzzy >= 0) return -1;
+                fuzzy = i;
+            }
+        }
+        return fuzzy;
     }
 
     private int parseIndex(String spec, int width) {
@@ -556,15 +602,73 @@ public class PointExtractor {
         }
     }
 
-    private String[] splitCsvLine(String line) {
+    public String decodeText(byte[] bytes) {
+        if (bytes == null || bytes.length == 0) return "";
+        if (bytes.length >= 2) {
+            int first = bytes[0] & 0xff, second = bytes[1] & 0xff;
+            if (first == 0xff && second == 0xfe)
+                return new String(bytes, 2, bytes.length - 2, StandardCharsets.UTF_16LE);
+            if (first == 0xfe && second == 0xff)
+                return new String(bytes, 2, bytes.length - 2, StandardCharsets.UTF_16BE);
+        }
+        try {
+            return StandardCharsets.UTF_8
+                    .newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(java.nio.ByteBuffer.wrap(bytes))
+                    .toString()
+                    .replaceFirst("^\\uFEFF", "");
+        } catch (CharacterCodingException e) {
+            return new String(bytes, Charset.forName("GB18030")).replaceFirst("^\\uFEFF", "");
+        }
+    }
+
+    private char detectDelimiter(String[] lines) {
+        for (String line : lines) {
+            if (line == null || line.isBlank() || line.startsWith("#")) continue;
+            int commas = delimiterCount(line, ','), tabs = delimiterCount(line, '\t');
+            int semicolons = delimiterCount(line, ';');
+            if (tabs > commas && tabs >= semicolons) return '\t';
+            if (semicolons > commas) return ';';
+            return ',';
+        }
+        return ',';
+    }
+
+    private int delimiterCount(String line, char delimiter) {
+        int count = 0;
+        boolean quoted = false;
+        for (int i = 0; i < line.length(); i++) {
+            char value = line.charAt(i);
+            if (value == '"') quoted = !quoted;
+            else if (value == delimiter && !quoted) count++;
+        }
+        return count;
+    }
+
+    private String normalizeColumn(String value) {
+        if (value == null) return "";
+        return value.replace("\uFEFF", "")
+                .trim()
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^\\p{L}\\p{N}]", "");
+    }
+
+    private String[] splitCsvLine(String line, char delimiter) {
         List<String> cells = new ArrayList<>();
         StringBuilder current = new StringBuilder();
         boolean quoted = false;
         for (int i = 0; i < line.length(); i++) {
             char c = line.charAt(i);
             if (c == '"') {
-                quoted = !quoted;
-            } else if ((c == ',' || c == '\t') && !quoted) {
+                if (quoted && i + 1 < line.length() && line.charAt(i + 1) == '"') {
+                    current.append('"');
+                    i++;
+                } else {
+                    quoted = !quoted;
+                }
+            } else if (c == delimiter && !quoted) {
                 cells.add(current.toString().trim());
                 current.setLength(0);
             } else {

@@ -298,12 +298,19 @@ class BioNoteAgentToolIntegrationTest {
                                 .cached())
                 .isTrue();
         var different = json.createObjectNode().put("includeMemberCounts", true);
+        executor.execute(context(), "get_project_overview", different, names, memory);
+        executor.execute(
+                context(),
+                "get_project_overview",
+                json.createObjectNode(),
+                names,
+                memory);
         assertThatThrownBy(
                         () ->
                                 executor.execute(
                                         context(),
                                         "get_project_overview",
-                                        different,
+                                        json.createObjectNode().putNull("includeMemberCounts"),
                                         names,
                                         memory))
                 .isInstanceOfSatisfying(

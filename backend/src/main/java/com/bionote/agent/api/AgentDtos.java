@@ -92,7 +92,11 @@ public final class AgentDtos {
     public record ChatMessage(
             @Schema(allowableValues = {"user", "assistant"}) String role,
             @Size(max = 12000) String content,
-            String metadata) {}
+            String metadata) {
+        public ChatMessage(String role, String content) {
+            this(role, content, null);
+        }
+    }
 
     public record FitProposalView(
             String equation,
@@ -113,7 +117,13 @@ public final class AgentDtos {
     public record ChatRequest(
             @NotBlank @Size(max = 2000) String message,
             @Size(max = 20) @Valid List<ChatMessage> history,
-            FitProposalView fitConfirm) {}
+            FitProposalView fitConfirm,
+            @Size(max = 5) List<UUID> referenceIds) {
+        public ChatRequest(
+                String message, List<ChatMessage> history, FitProposalView fitConfirm) {
+            this(message, history, fitConfirm, List.of());
+        }
+    }
 
     public record ChatReferenceView(
             UUID id,

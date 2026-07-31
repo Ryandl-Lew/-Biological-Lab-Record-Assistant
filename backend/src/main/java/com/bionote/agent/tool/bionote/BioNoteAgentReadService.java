@@ -11,7 +11,6 @@ import com.bionote.revision.RevisionDtos;
 import com.bionote.revision.RevisionQueryService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -417,7 +416,7 @@ public class BioNoteAgentReadService {
                 }
                 content = sb.toString();
             } else {
-                content = new String(bytes, StandardCharsets.UTF_8);
+                content = extractor.decodeText(bytes);
             }
         } catch (ApiException e) {
             throw e;

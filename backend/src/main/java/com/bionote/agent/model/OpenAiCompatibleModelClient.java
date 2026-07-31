@@ -62,6 +62,25 @@ public class OpenAiCompatibleModelClient implements AgentModelClient {
 
     @Override
     public AgentModelResponse complete(AgentModelRequest request) {
+        ModelClientException last = null;
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            try {
+                return completeOnce(request);
+            } catch (ModelClientException e) {
+                last = e;
+                if (attempt == 3 || !retryable(e)) throw e;
+                try {
+                    Thread.sleep(attempt == 1 ? 300 : 900);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw e;
+                }
+            }
+        }
+        throw last;
+    }
+
+    private AgentModelResponse completeOnce(AgentModelRequest request) {
         AgentCredentials active = activeCredentials();
         String model =
                 request != null && !blank(request.model()) ? request.model() : active.model();
@@ -72,8 +91,12 @@ public class OpenAiCompatibleModelClient implements AgentModelClient {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("model", model);
             body.put("messages", messages(request));
-            body.put("tools", request.tools().stream().map(this::tool).toList());
-            body.put("tool_choice", "auto");
+            if (!request.tools().isEmpty()) {
+                body.put("tools", request.tools().stream().map(this::tool).toList());
+                body.put("tool_choice", "auto");
+            } else {
+                body.put("response_format", Map.of("type", "json_object"));
+            }
             body.put("temperature", 0);
             body.put("max_tokens", request.maxOutputTokens());
             if (model.toLowerCase().startsWith("deepseek"))
@@ -128,6 +151,14 @@ public class OpenAiCompatibleModelClient implements AgentModelClient {
                     "Model provider response could not be processed: " + e.getMessage(),
                     e);
         }
+    }
+
+    private boolean retryable(ModelClientException error) {
+        if ("AGENT_TIMEOUT".equals(error.code()) || "AGENT_RATE_LIMITED".equals(error.code()))
+            return true;
+        String message = error.getMessage() == null ? "" : error.getMessage();
+        return "MODEL_PROVIDER_UNAVAILABLE".equals(error.code())
+                && (message.contains("status 5") || error.getCause() instanceof ResourceAccessException);
     }
 
     private AgentCredentials activeCredentials() {

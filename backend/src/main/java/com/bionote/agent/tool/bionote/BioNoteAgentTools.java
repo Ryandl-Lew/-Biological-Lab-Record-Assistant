@@ -205,12 +205,20 @@ public class BioNoteAgentTools {
             BioNoteAgentReadService reads, ObjectMapper json) {
         return tool(
                 "read_attachment_content",
-                "Read full text content of a text-based attachment (CSV/TXT/MD). Pass the original_filename value from list_project_attachments as the filename parameter — the system will locate the file automatically.",
+                "Read CSV/TXT/MD/XLSX content. Use attachmentId or filename for a record attachment, or referenceId for a temporary file attached to the current chat message.",
                 ReadAttachmentInput.class,
                 input(
                         json,
-                        Map.of("filename", "string", "recordId", "string"),
-                        List.of("filename")),
+                        Map.of(
+                                "attachmentId",
+                                "string",
+                                "filename",
+                                "string",
+                                "recordId",
+                                "string",
+                                "referenceId",
+                                "string"),
+                        List.of()),
                 BOTH,
                 (c, i) -> reads.readAttachmentContent(c, i.attachmentId, i.recordId));
     }
@@ -357,7 +365,7 @@ public class BioNoteAgentTools {
         }
     }
 
-    public record ReadAttachmentInput(@NotNull UUID attachmentId, UUID recordId) {}
+    public record ReadAttachmentInput(UUID attachmentId, UUID recordId) {}
 
     public record PlotChartInput(
             String chartType,

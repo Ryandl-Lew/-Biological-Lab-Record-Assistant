@@ -18,6 +18,9 @@ public class FitIntentParser {
                     "(?i)(?:xField|自变量|x列)\\s*[=:：]\\s*([A-Za-z0-9_\\-]+)|(?:^|[；;，,\\s])x\\s*[=:：]\\s*([A-Za-z0-9_\\-]+)");
     private static final Pattern Y_SPEC =
             Pattern.compile("(?i)(?:yField|因变量|y列)\\s*[=:：]\\s*([A-Za-z0-9_\\-]+)");
+    private static final Pattern NATURAL_PAIR =
+            Pattern.compile(
+                    "(?i)用\\s*([\\p{L}\\p{N}_（）()\\-]+)\\s*(?:和|与|、|,)\\s*([\\p{L}\\p{N}_（）()\\-]+)\\s*(?:做|进行)?(?:曲线)?拟合");
     private static final Pattern CODE = Pattern.compile("EXP-\\d{8}-[A-Za-z0-9]+");
     private static final Pattern JSON_BLOCK = Pattern.compile("\\{[\\s\\S]*\"equation\"[\\s\\S]*}");
 
@@ -45,9 +48,20 @@ public class FitIntentParser {
         }
         String xSpec = firstGroup(X_SPEC, message);
         String ySpec = firstGroup(Y_SPEC, message);
+        if (xSpec == null || ySpec == null) {
+            Matcher natural = NATURAL_PAIR.matcher(message);
+            if (natural.find()) {
+                if (xSpec == null) xSpec = natural.group(1).trim();
+                if (ySpec == null) ySpec = natural.group(2).trim();
+            }
+        }
 
-        // Only treat as a fit request when concrete parameters are provided
-        boolean requested = equation != null || (xSpec != null && ySpec != null);
+        boolean requested =
+                equation != null
+                        || (xSpec != null && ySpec != null)
+                        || message.contains("拟合")
+                        || message.contains("回归")
+                        || message.toLowerCase(Locale.ROOT).contains("curve fit");
         if (!requested) {
             return new FitModels.FitIntent(
                     false, null, null, null, null, null, List.of(), List.of(), null, null, null);

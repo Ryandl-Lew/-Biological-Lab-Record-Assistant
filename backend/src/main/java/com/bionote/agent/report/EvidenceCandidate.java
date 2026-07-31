@@ -33,7 +33,7 @@ public record EvidenceCandidate(
 
     public static EvidenceCandidate record(UUID projectId, UUID recordId, String label) {
         return new EvidenceCandidate(
-                "实验记录",
+                "RECORD",
                 recordId.toString(),
                 projectId,
                 recordId,
@@ -48,7 +48,7 @@ public record EvidenceCandidate(
     public static EvidenceCandidate revision(
             UUID projectId, UUID recordId, UUID revisionId, String label) {
         return new EvidenceCandidate(
-                "版本",
+                "REVISION",
                 revisionId.toString(),
                 projectId,
                 recordId,
@@ -63,7 +63,7 @@ public record EvidenceCandidate(
     public static EvidenceCandidate review(
             UUID projectId, UUID recordId, UUID revisionId, UUID reviewId, String label) {
         return new EvidenceCandidate(
-                "审核",
+                "REVIEW",
                 reviewId.toString(),
                 projectId,
                 recordId,
@@ -78,13 +78,22 @@ public record EvidenceCandidate(
     public static EvidenceCandidate audit(
             UUID projectId, UUID recordId, UUID auditId, String label) {
         return new EvidenceCandidate(
-                "活动", auditId.toString(), projectId, recordId, null, null, null, null, null, label);
+                "AUDIT_EVENT",
+                auditId.toString(),
+                projectId,
+                recordId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                label);
     }
 
     public static EvidenceCandidate diff(
             UUID projectId, UUID recordId, UUID from, UUID to, String sourceHash, String label) {
         return new EvidenceCandidate(
-                "版本对比",
+                "REVISION_DIFF",
                 recordId + ":" + from + ":" + to,
                 projectId,
                 recordId,

@@ -15,7 +15,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -25,9 +27,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AgentChatController {
     private static final Logger log = LoggerFactory.getLogger(AgentChatController.class);
     private final AgentChatUseCase service;
+    private final AgentChatReferenceUseCase references;
 
-    public AgentChatController(AgentChatUseCase service) {
+    public AgentChatController(AgentChatUseCase service, AgentChatReferenceUseCase references) {
         this.service = service;
+        this.references = references;
     }
 
     @Operation(summary = "记录内轻量问答", description = "项目成员可基于当前记录只读上下文提问；不调用领域工具，不落库。")
@@ -57,6 +61,28 @@ public class AgentChatController {
         return ApiResponse.of(
                 service.chatAboutProject(
                         UUID.fromString(authentication.getName()), projectId, request));
+    }
+
+    @PostMapping(
+            value = "/projects/{projectId}/agent-chat/references",
+            consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    ApiResponse<AgentDtos.ChatReferenceView> uploadReference(
+            Authentication authentication,
+            @PathVariable UUID projectId,
+            @RequestPart("file") MultipartFile file) {
+        return ApiResponse.of(
+                references.upload(
+                        UUID.fromString(authentication.getName()), projectId, file));
+    }
+
+    @DeleteMapping("/projects/{projectId}/agent-chat/references/{referenceId}")
+    ApiResponse<Void> deleteReference(
+            Authentication authentication,
+            @PathVariable UUID projectId,
+            @PathVariable UUID referenceId) {
+        references.delete(
+                UUID.fromString(authentication.getName()), projectId, referenceId);
+        return ApiResponse.of(null);
     }
 
     @GetMapping("/projects/{projectId}/agent-chat/sessions")

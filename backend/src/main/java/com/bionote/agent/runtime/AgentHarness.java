@@ -10,6 +10,7 @@ import com.bionote.agent.prompt.PromptVersionService;
 import com.bionote.agent.tool.AgentToolContext;
 import com.bionote.agent.tool.AgentToolExecutor;
 import com.bionote.agent.trace.AgentTraceRecorder;
+import com.bionote.agent.validation.AgentArtifactNormalizer;
 import com.bionote.agent.validation.AgentResultValidator;
 import com.bionote.agent.validation.ValidationResult;
 import com.bionote.collaboration.event.AgentRunFailedEvent;
@@ -21,6 +22,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +39,7 @@ public class AgentHarness {
     private final AgentPlanner planner;
     private final AgentToolExecutor tools;
     private final AgentResultValidator validator;
+    private final AgentArtifactNormalizer normalizer;
     private final AgentTraceRecorder trace;
     private final ObjectMapper json;
     private final DomainEventPublisher events;
@@ -50,6 +53,7 @@ public class AgentHarness {
             AgentPlanner planner,
             AgentToolExecutor tools,
             AgentResultValidator validator,
+            AgentArtifactNormalizer normalizer,
             AgentTraceRecorder trace,
             ObjectMapper json,
             DomainEventPublisher events) {
@@ -61,6 +65,7 @@ public class AgentHarness {
         this.planner = planner;
         this.tools = tools;
         this.validator = validator;
+        this.normalizer = normalizer;
         this.trace = trace;
         this.json = json;
         this.events = events;
@@ -157,6 +162,33 @@ public class AgentHarness {
                                         runs.load(runId), prompt, memory, limits, deadline),
                                 response);
                 if (decision instanceof PlannerDecision.Fail failed) {
+                    if (isReportPrompt(prompt)
+                            && failed.code() != null
+                            && failed.code().contains("LIMIT")) {
+                        forceSummary(runId, prompt, memory, limits, failed.message());
+                        return;
+                    }
+                    if (isReportPrompt(prompt)
+                            && memory.modelCalls() < limits.maxModelCalls()
+                            && Set.of(
+                                            "AGENT_INVALID_OUTPUT",
+                                            "AGENT_MODEL_RESPONSE_INVALID",
+                                            "AGENT_UNKNOWN_TOOL",
+                                            "AGENT_TOOL_ARGUMENTS_INVALID")
+                                    .contains(failed.code())) {
+                        memory.addMessage(
+                                new AgentModelRequest.ModelMessage(
+                                        "user",
+                                        write(
+                                                Map.of(
+                                                        "runtimeError",
+                                                        failed.message(),
+                                                        "instruction",
+                                                        "Recover now: use only allowed tools or return one complete JSON object matching the schema.")),
+                                        null,
+                                        null));
+                        continue;
+                    }
                     terminal(runId, statusFor(failed.code()), failed.code(), failed.message());
                     return;
                 }
@@ -195,13 +227,44 @@ public class AgentHarness {
                                         current.artifactKind(),
                                         deadline,
                                         () -> runs.cancelRequested(runId));
-                        AgentToolExecutor.ExecutedToolResult result =
-                                tools.execute(
-                                        toolContext,
-                                        call.name(),
-                                        call.arguments(),
-                                        prompt.allowedTools(),
-                                        memory);
+                        AgentToolExecutor.ExecutedToolResult result;
+                        try {
+                            result =
+                                    tools.execute(
+                                            toolContext,
+                                            call.name(),
+                                            call.arguments(),
+                                            prompt.allowedTools(),
+                                            memory);
+                        } catch (ApiException e) {
+                            if ("AGENT_RUN_CANCELLED".equals(e.code())
+                                    || "AGENT_TIMEOUT".equals(e.code())) throw e;
+                            if (!isReportPrompt(prompt)) throw e;
+                            runs.incrementToolCalls(runId, 1);
+                            trace.record(
+                                    runId,
+                                    "TOOL_ERROR",
+                                    call.name(),
+                                    null,
+                                    Map.of("errorCode", e.code(), "message", e.getMessage()),
+                                    0,
+                                    0,
+                                    0);
+                            memory.addMessage(
+                                    new AgentModelRequest.ModelMessage(
+                                            "tool",
+                                            write(
+                                                    Map.of(
+                                                            "errorCode",
+                                                            e.code(),
+                                                            "message",
+                                                            e.getMessage(),
+                                                            "instruction",
+                                                            "Do not repeat the same invalid call. Continue with available evidence or finish with a limitation.")),
+                                            call.id(),
+                                            call.name()));
+                            continue;
+                        }
                         runs.incrementToolCalls(runId, 1);
                         trace.record(
                                 runId,
@@ -246,6 +309,48 @@ public class AgentHarness {
                         0,
                         0);
                 if (!validation.valid()) {
+                    boolean evidenceFailure =
+                            validation.errors().stream()
+                                    .anyMatch(value -> value.startsWith("EVIDENCE:"));
+                    if (evidenceFailure
+                            && normalizer.hasUnknownDeclaredEvidence(
+                                    validationContext, finish.candidateArtifact())) {
+                        if (memory.repairTurns() == 0) {
+                            memory.incrementRepairTurns();
+                            memory.addMessage(
+                                    new AgentModelRequest.ModelMessage(
+                                            "user",
+                                            write(
+                                                    Map.of(
+                                                            "validationErrors",
+                                                            validation.errors(),
+                                                            "instruction",
+                                                            "The evidence ID was not returned by any tool. Correct it using only tool-provided evidence and return one JSON object.")),
+                                            null,
+                                            null));
+                            continue;
+                        }
+                        terminal(
+                                runId,
+                                "INVALID_OUTPUT",
+                                "AGENT_EVIDENCE_INVALID",
+                                String.join("; ", validation.errors()));
+                        return;
+                    }
+                    if (isReportPrompt(prompt)) {
+                        JsonNode recovered =
+                                normalizer.normalize(
+                                        validationContext,
+                                        finish.candidateArtifact(),
+                                        "模型输出已由运行时自动修复，以满足结构与证据约束。");
+                        ValidationResult recoveredValidation =
+                                validator.validate(
+                                        validationContext, recovered, prompt.outputSchema());
+                        if (recoveredValidation.valid()) {
+                            saveArtifact(runId, recovered, "VALIDATION_RECOVERED");
+                            return;
+                        }
+                    }
                     if (memory.repairTurns() < limits.maxRepairTurns()) {
                         memory.incrementRepairTurns();
                         memory.addMessage(
@@ -264,39 +369,53 @@ public class AgentHarness {
                     terminal(
                             runId,
                             "INVALID_OUTPUT",
-                            validation.errors().stream()
-                                            .anyMatch(value -> value.startsWith("EVIDENCE:"))
-                                    ? "AGENT_EVIDENCE_INVALID"
-                                    : "AGENT_INVALID_OUTPUT",
+                            evidenceFailure ? "AGENT_EVIDENCE_INVALID" : "AGENT_INVALID_OUTPUT",
                             String.join("; ", validation.errors()));
                     return;
                 }
-                JsonNode evidence = finish.candidateArtifact().path("evidence");
-                UUID artifact =
-                        lifecycle.completeWithArtifact(
-                                runId,
-                                finish.candidateArtifact(),
-                                evidence.isMissingNode() ? json.createArrayNode() : evidence);
-                trace.record(
-                        runId,
-                        "ARTIFACT_SAVED",
-                        null,
-                        null,
-                        Map.of("artifactId", artifact),
-                        0,
-                        0,
-                        0);
+                saveArtifact(runId, finish.candidateArtifact(), "ARTIFACT_SAVED");
                 return;
             }
         } catch (ModelClientException e) {
-            terminalIfRunning(runId, statusFor(e.code()), e.code(), e.getMessage());
+            if (isReportPrompt(prompt)) {
+                completeFallback(
+                        runId,
+                        prompt,
+                        memory,
+                        limits,
+                        deadline,
+                        "模型服务暂时不可用，已生成可展示的安全基础报告。");
+            } else {
+                terminalIfRunning(runId, statusFor(e.code()), e.code(), e.getMessage());
+            }
         } catch (ApiException e) {
-            String status =
-                    "AGENT_RUN_CANCELLED".equals(e.code()) ? "CANCELLED" : statusFor(e.code());
-            terminalIfRunning(runId, status, e.code(), e.getMessage());
+            if ("AGENT_RUN_CANCELLED".equals(e.code())) {
+                terminalIfRunning(runId, "CANCELLED", e.code(), e.getMessage());
+            } else if (isReportPrompt(prompt)) {
+                completeFallback(
+                        runId,
+                        prompt,
+                        memory,
+                        limits,
+                        deadline,
+                        "部分数据读取失败，已根据当前可用证据生成报告。");
+            } else {
+                terminalIfRunning(runId, statusFor(e.code()), e.code(), e.getMessage());
+            }
         } catch (Exception e) {
             log.error("Agent runtime failed for run {}", runId, e);
-            terminalIfRunning(runId, "FAILED", "AGENT_RUNTIME_FAILED", "Agent runtime failed");
+            if (isReportPrompt(prompt)) {
+                completeFallback(
+                        runId,
+                        prompt,
+                        memory,
+                        limits,
+                        deadline,
+                        "运行时已从异常中恢复，并生成安全基础报告。");
+            } else {
+                terminalIfRunning(
+                        runId, "FAILED", "AGENT_RUNTIME_FAILED", "Agent runtime failed");
+            }
         }
     }
 
@@ -310,6 +429,18 @@ public class AgentHarness {
             AgentRunRecord run = runs.load(runId);
             if (!("RUNNING".equals(run.status()))) {
                 log.warn("forceSummary: run {} is not RUNNING, status={}", runId, run.status());
+                return;
+            }
+            if (!isReportPrompt(prompt)) {
+                String message =
+                        reason.contains("步数")
+                                ? "execution step limit exceeded"
+                                : reason.contains("模型")
+                                        ? "model call limit exceeded"
+                                        : reason.contains("工具")
+                                                ? "tool call limit exceeded"
+                                                : reason;
+                terminal(runId, "LIMIT_EXCEEDED", "AGENT_LIMIT_EXCEEDED", message);
                 return;
             }
             memory.addMessage(
@@ -355,26 +486,73 @@ public class AgentHarness {
                             limits.maxOutputTokens());
             AgentModelResponse response = model.complete(request);
             memory.incrementModelCalls();
-            if (response.finalOutput() != null) {
-                JsonNode artifact = response.finalOutput();
-                lifecycle.completeWithArtifact(runId, artifact, json.createArrayNode());
-                trace.record(
-                        runId,
-                        "FORCE_SUMMARY_SAVED",
-                        null,
-                        null,
-                        Map.of("reason", reason),
-                        0,
-                        0,
-                        0);
-            } else {
-                terminal(runId, "LIMIT_EXCEEDED", "AGENT_LIMIT_EXCEEDED", reason + ":" + reason);
-            }
+            AgentRunContext context =
+                    new AgentRunContext(runs.load(runId), prompt, memory, limits, Instant.now());
+            JsonNode artifact = normalizer.normalize(context, response.finalOutput(), reason);
+            saveArtifact(runId, artifact, "FORCE_SUMMARY_SAVED");
         } catch (Exception e) {
             log.warn("forceSummary failed for run {}: {}", runId, e.getMessage());
-            terminalIfRunning(
-                    runId, "LIMIT_EXCEEDED", "AGENT_LIMIT_EXCEEDED", reason + "（总结生成也失败了）");
+            completeFallback(
+                    runId,
+                    prompt,
+                    memory,
+                    limits,
+                    Instant.now(),
+                    reason + "；模型未能完成最终输出，已生成安全基础报告。");
         }
+    }
+
+    private void completeFallback(
+            UUID runId,
+            PromptVersion prompt,
+            AgentRunMemory memory,
+            AgentLimits limits,
+            Instant deadline,
+            String reason) {
+        try {
+            if (!"RUNNING".equals(runs.load(runId).status())) return;
+            AgentRunContext context =
+                    new AgentRunContext(runs.load(runId), prompt, memory, limits, deadline);
+            JsonNode artifact = normalizer.normalize(context, null, reason);
+            ValidationResult validation =
+                    validator.validate(context, artifact, prompt.outputSchema());
+            if (!validation.valid()) {
+                terminal(
+                        runId,
+                        "INVALID_OUTPUT",
+                        "AGENT_INVALID_OUTPUT",
+                        String.join("; ", validation.errors()));
+                return;
+            }
+            saveArtifact(runId, artifact, "FALLBACK_ARTIFACT_SAVED");
+        } catch (Exception e) {
+            log.error("Agent fallback failed for run {}", runId, e);
+            terminalIfRunning(
+                    runId, "FAILED", "AGENT_RUNTIME_FAILED", "Agent runtime fallback failed");
+        }
+    }
+
+    private void saveArtifact(UUID runId, JsonNode artifact, String traceType) {
+        JsonNode evidence = artifact.path("evidence");
+        UUID artifactId =
+                lifecycle.completeWithArtifact(
+                        runId,
+                        artifact,
+                        evidence.isMissingNode() ? json.createArrayNode() : evidence);
+        trace.record(
+                runId,
+                traceType,
+                null,
+                null,
+                Map.of("artifactId", artifactId),
+                0,
+                0,
+                0);
+    }
+
+    private boolean isReportPrompt(PromptVersion prompt) {
+        return prompt != null
+                && Set.of("record-summary", "project-progress").contains(prompt.name());
     }
 
     private String statusFor(String code) {

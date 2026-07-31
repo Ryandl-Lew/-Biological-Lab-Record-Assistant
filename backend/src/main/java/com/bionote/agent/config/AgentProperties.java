@@ -9,18 +9,18 @@ public class AgentProperties {
     private String baseUrl = "";
     private String apiKey = "";
     private String model = "fake-deterministic-v1";
-    private long timeoutMs = 30000;
+    private long timeoutMs = 45000;
     private long workerPollMs = 1000;
     private long workerStaleTimeoutMs = 600000;
-    private int maxSteps = 200;
-    private int maxToolCalls = 160;
-    private int maxModelCalls = 80;
-    private long maxDurationMs = 1200000;
-    private int maxOutputTokens = 16000;
-    private int maxRepairTurns = 2;
-    private int maxConcurrentPerUser = 2;
-    private int maxConcurrentPerProject = 2;
-    private long sameSubjectCooldownSeconds = 60;
+    private int maxSteps = 120;
+    private int maxToolCalls = 60;
+    private int maxModelCalls = 24;
+    private long maxDurationMs = 480000;
+    private int maxOutputTokens = 6000;
+    private int maxRepairTurns = 3;
+    private int maxConcurrentPerUser = 4;
+    private int maxConcurrentPerProject = 4;
+    private long sameSubjectCooldownSeconds = 5;
 
     public boolean isEnabled() {
         return enabled;

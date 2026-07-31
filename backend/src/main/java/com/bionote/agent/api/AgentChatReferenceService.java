@@ -5,7 +5,6 @@ import com.bionote.attachment.AttachmentStorage;
 import com.bionote.common.ApiException;
 import com.bionote.project.ProjectMemberStore;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
@@ -216,12 +215,9 @@ public class AgentChatReferenceService implements AgentChatReferenceUseCase {
             peek.put("kind", "table");
             peek.put("columns", headers);
             if (lower.endsWith(".csv")) {
+                String decoded = extractor.decodeText(bytes);
                 String sample =
-                        new String(
-                                bytes,
-                                0,
-                                Math.min(bytes.length, MAX_TEXT_PREVIEW),
-                                StandardCharsets.UTF_8);
+                        decoded.substring(0, Math.min(decoded.length(), MAX_TEXT_PREVIEW));
                 peek.put("textPreview", sample);
             } else {
                 // Extract data rows from Excel, up to 500 rows
@@ -233,8 +229,12 @@ public class AgentChatReferenceService implements AgentChatReferenceUseCase {
                     }
                     int dataStart = headers.isEmpty() ? 0 : 1;
                     int rowCount = 0;
-                    int maxPreviewRows = 5;
-                    for (int i = dataStart; i < rows.size() && rowCount < maxPreviewRows; i++) {
+                    int maxPreviewRows = 100;
+                    for (int i = dataStart;
+                            i < rows.size()
+                                    && rowCount < maxPreviewRows
+                                    && sb.length() < MAX_TEXT_PREVIEW;
+                            i++) {
                         String[] row = rows.get(i);
                         if (row.length == 0) continue;
                         sb.append(String.join(",", row)).append('\n');
@@ -249,13 +249,10 @@ public class AgentChatReferenceService implements AgentChatReferenceUseCase {
                 || lower.endsWith(".md")
                 || (contentType != null && contentType.startsWith("text/"))) {
             peek.put("kind", "text");
+            String decoded = extractor.decodeText(bytes);
             peek.put(
                     "textPreview",
-                    new String(
-                            bytes,
-                            0,
-                            Math.min(bytes.length, MAX_TEXT_PREVIEW),
-                            StandardCharsets.UTF_8));
+                    decoded.substring(0, Math.min(decoded.length(), MAX_TEXT_PREVIEW)));
         } else {
             peek.put("kind", "opaque");
             peek.put(

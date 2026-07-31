@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { CircleHelp } from 'lucide-react'
-import { sendProjectAgentChat } from '@/api/agentChat'
+import { CircleHelp, Paperclip, X } from 'lucide-react'
+import {
+  deleteProjectAgentReference,
+  sendProjectAgentChat,
+  uploadProjectAgentReference,
+} from '@/api/agentChat'
 import { Button, Surface } from '@/components/ui'
 import { agentErrorMessage, trimChatHistory } from './messages'
 import { renderMarkdown } from '@/lib/renderMarkdown'
@@ -163,7 +167,11 @@ export default function ProjectChatPanel({
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [helpOpen, setHelpOpen] = useState(false)
+  const [references, setReferences] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const bottomRef = useRef(null)
+  const fileInputRef = useRef(null)
   const tall = variant === 'page'
 
   useEffect(() => {
@@ -185,6 +193,7 @@ export default function ProjectChatPanel({
     setMessages(restored)
     setDraft('')
     setError('')
+    setReferences([])
   }, [project.id, initialMessages])
 
   useEffect(() => {
@@ -202,7 +211,11 @@ export default function ProjectChatPanel({
     const history = trimChatHistory(messages)
     setMessages((current) => [...current, { role: 'user', content: message }])
     try {
-      const body = { message, history }
+      const body = {
+        message,
+        history,
+        referenceIds: references.map((item) => item.id),
+      }
       const result = await sendProjectAgentChat(project.id, body)
       const fits =
         Array.isArray(result.fits) && result.fits.length > 0
@@ -249,6 +262,37 @@ export default function ProjectChatPanel({
     const text = draft.trim()
     if (!text) return
     await sendPayload(text)
+  }
+
+  const uploadReference = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || uploading) return
+    if (references.length >= 5) {
+      setError('单次对话最多关联 5 个附件。')
+      return
+    }
+    setUploading(true)
+    setUploadProgress(0)
+    setError('')
+    try {
+      const uploaded = await uploadProjectAgentReference(project.id, file, setUploadProgress)
+      setReferences((current) => [...current, uploaded])
+    } catch (uploadError) {
+      setError(agentErrorMessage(uploadError))
+    } finally {
+      setUploading(false)
+      setUploadProgress(0)
+    }
+  }
+
+  const removeReference = async (reference) => {
+    setReferences((current) => current.filter((item) => item.id !== reference.id))
+    try {
+      await deleteProjectAgentReference(project.id, reference.id)
+    } catch {
+      // The local chip is removed even if an already-expired temporary reference is gone.
+    }
   }
 
   const onKeyDown = (event) => {
@@ -334,7 +378,48 @@ export default function ProjectChatPanel({
             {error}
           </p>
         )}
+        {references.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2" aria-label="已关联附件">
+            {references.map((reference) => (
+              <span
+                key={reference.id}
+                className="inline-flex max-w-full items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs text-brand-800"
+              >
+                <span className="truncate">{reference.filename}</span>
+                {reference.columns?.length ? (
+                  <span className="hidden text-brand-500 sm:inline">
+                    {reference.columns.slice(0, 4).join(', ')}
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  aria-label={`移除附件 ${reference.filename}`}
+                  onClick={() => removeReference(reference)}
+                  className="rounded-full p-0.5 hover:bg-brand-100"
+                >
+                  <X size={13} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <div className="mt-3 flex items-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept=".csv,.xlsx,.txt,.md,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            onChange={uploadReference}
+          />
+          <Button
+            variant="secondary"
+            icon={Paperclip}
+            loading={uploading}
+            disabled={sending || references.length >= 5}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {uploading ? `${uploadProgress}%` : '附件'}
+          </Button>
           <textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}

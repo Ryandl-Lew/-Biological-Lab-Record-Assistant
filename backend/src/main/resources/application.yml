@@ -31,18 +31,18 @@ agent:
   base-url: ''
   api-key: ''
   model: ''
-  timeout-ms: ${AGENT_TIMEOUT_MS:30000}
+  timeout-ms: ${AGENT_TIMEOUT_MS:45000}
   worker-poll-ms: ${AGENT_WORKER_POLL_MS:1000}
   worker-stale-timeout-ms: ${AGENT_WORKER_STALE_TIMEOUT_MS:600000}
-  max-steps: ${AGENT_MAX_STEPS:30}
-  max-tool-calls: ${AGENT_MAX_TOOL_CALLS:12}
-  max-model-calls: ${AGENT_MAX_MODEL_CALLS:6}
-  max-duration-ms: ${AGENT_MAX_DURATION_MS:120000}
-  max-output-tokens: ${AGENT_MAX_OUTPUT_TOKENS:2000}
-  max-repair-turns: ${AGENT_MAX_REPAIR_TURNS:1}
-  max-concurrent-per-user: ${AGENT_MAX_CONCURRENT_PER_USER:2}
-  max-concurrent-per-project: ${AGENT_MAX_CONCURRENT_PER_PROJECT:2}
-  same-subject-cooldown-seconds: ${AGENT_SAME_SUBJECT_COOLDOWN_SECONDS:60}
+  max-steps: ${AGENT_MAX_STEPS:120}
+  max-tool-calls: ${AGENT_MAX_TOOL_CALLS:60}
+  max-model-calls: ${AGENT_MAX_MODEL_CALLS:24}
+  max-duration-ms: ${AGENT_MAX_DURATION_MS:480000}
+  max-output-tokens: ${AGENT_MAX_OUTPUT_TOKENS:6000}
+  max-repair-turns: ${AGENT_MAX_REPAIR_TURNS:3}
+  max-concurrent-per-user: ${AGENT_MAX_CONCURRENT_PER_USER:4}
+  max-concurrent-per-project: ${AGENT_MAX_CONCURRENT_PER_PROJECT:4}
+  same-subject-cooldown-seconds: ${AGENT_SAME_SUBJECT_COOLDOWN_SECONDS:5}
   progress-stale-days: ${AGENT_PROGRESS_STALE_DAYS:14}
 bionote:
   llm-config-path: ${LLM_CONFIG_PATH:}

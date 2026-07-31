@@ -17,7 +17,7 @@ export class ApiError extends Error {
  * @param {RequestInit} [options]
  */
 export async function request(path, options = {}) {
-  const { responseType = 'json', ...fetchOptions } = options
+  const { responseType = 'json', timeoutMs = 0, ...fetchOptions } = options
   const token = localStorage.getItem('auth_token')
   const headers = new Headers(fetchOptions.headers)
   headers.set('Accept', responseType === 'blob' ? '*/*' : 'application/json')
@@ -33,10 +33,21 @@ export async function request(path, options = {}) {
   }
 
   let response
+  let timeoutId = null
+  const controller = timeoutMs > 0 && !fetchOptions.signal ? new AbortController() : null
+  if (controller) {
+    fetchOptions.signal = controller.signal
+    timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
+  }
   try {
     response = await fetch(`${API_BASE_URL}${path}`, { ...fetchOptions, headers })
-  } catch {
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new ApiError('AI 回复超时，请重新发送；系统不会无限等待。', 'REQUEST_TIMEOUT', null, 0)
+    }
     throw new ApiError('无法连接服务器，请稍后重试', 'NETWORK_ERROR', null, 0)
+  } finally {
+    if (timeoutId != null) window.clearTimeout(timeoutId)
   }
 
   const payload =
